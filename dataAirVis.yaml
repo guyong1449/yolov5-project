@@ -1,0 +1,23 @@
+# Train/val/test sets as 1) dir: path/to/imgs, 2) file: path/to/imgs.txt, or 3) list: [path/to/imgs1, path/to/imgs2, ..]
+train: D:/data/YoloTrainVis/dataSet/train.txt
+val: D:/data/YoloTrainVis/dataSet/val.txt
+
+# Classes
+nc: 15  # number of classes
+names: [
+'ptarget',
+'bird',
+'drone',
+'fixedWing',
+'plane',
+'helicopter',
+'kite',
+'balloon',
+'vehicle',
+'person',
+'boat',
+'gear',
+'airfoil',
+'airtail',
+'birds'
+]
