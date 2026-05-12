@@ -216,9 +216,9 @@ def run(
 
 def parse_opt():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--weights', nargs='+', type=str, default=ROOT / 'best_laishui.pt', help='model path')
+    parser.add_argument('--weights', nargs='+', type=str, default=ROOT / 'checkpoint/yolov5_best.pt', help='model path')
     parser.add_argument('--source', type=str, default='D:\\VideoData\\video\\laishui0511\\00000003468000000', help='file path')
-    parser.add_argument('--data', type=str, default=ROOT / 'dataAirVis.yaml', help='dataset.yaml path')
+    parser.add_argument('--data', type=str, default=ROOT / 'data/dataAirVis.yaml', help='dataset.yaml path')
     parser.add_argument('--imgsz', '--img', '--img-size', nargs='+', type=int, default=[640])
     parser.add_argument('--conf-thres', type=float, default=0.25)
     parser.add_argument('--iou-thres', type=float, default=0.45)

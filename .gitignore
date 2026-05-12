@@ -25,6 +25,10 @@
 
 storage.googleapis.com
 runs/*
+checkpoint/
+note/
+notes/
+*.partial
 data/*
 data/images/*
 !data/*.yaml
