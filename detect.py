@@ -11,6 +11,7 @@ import sys
 from pathlib import Path
 
 import torch
+import xml.etree.ElementTree as ET
 
 FILE = Path(__file__).resolve()
 ROOT = FILE.parents[0]
@@ -25,6 +26,69 @@ from utils.general import (LOGGER, Profile, check_file, check_img_size, check_im
                            increment_path, non_max_suppression, print_args, scale_boxes, strip_optimizer, xyxy2xywh)
 from utils.torch_utils import select_device, smart_inference_mode
 
+def save_voc_xml(save_dir, img_filename, img_width, img_height, detections, depth=3):
+    """
+    保存 PASCAL VOC 格式的 XML 标注文件
+    :param save_dir: 保存目录（如 runs/detect/exp/annotations）
+    :param img_filename: 图片文件名（如 'video_frame000123.jpg'）
+    :param img_width: 图像宽度
+    :param img_height: 图像高度
+    :param detections: 检测结果列表，每个元素为 (x1, y1, x2, y2, class_name)
+    :param depth: 图像通道数，默认 3
+    """
+    annotation = ET.Element("annotation")
+    
+    # folder
+    folder = ET.SubElement(annotation, "folder")
+    folder.text = "images"
+    
+    # filename
+    filename = ET.SubElement(annotation, "filename")
+    filename.text = img_filename
+    
+    # source (可选)
+    source = ET.SubElement(annotation, "source")
+    database = ET.SubElement(source, "database")
+    database.text = "Unknown"
+    
+    # size
+    size = ET.SubElement(annotation, "size")
+    width = ET.SubElement(size, "width")
+    width.text = str(img_width)
+    height = ET.SubElement(size, "height")
+    height.text = str(img_height)
+    depth_elem = ET.SubElement(size, "depth")
+    depth_elem.text = str(depth)
+    
+    # segmented (默认 0)
+    segmented = ET.SubElement(annotation, "segmented")
+    segmented.text = "0"
+    
+    # 每个检测框
+    for x1, y1, x2, y2, class_name in detections:
+        obj = ET.SubElement(annotation, "object")
+        name = ET.SubElement(obj, "name")
+        name.text = class_name
+        pose = ET.SubElement(obj, "pose")
+        pose.text = "Unspecified"
+        truncated = ET.SubElement(obj, "truncated")
+        truncated.text = "0"
+        difficult = ET.SubElement(obj, "difficult")
+        difficult.text = "0"
+        bndbox = ET.SubElement(obj, "bndbox")
+        xmin = ET.SubElement(bndbox, "xmin")
+        xmin.text = str(int(x1))
+        ymin = ET.SubElement(bndbox, "ymin")
+        ymin.text = str(int(y1))
+        xmax = ET.SubElement(bndbox, "xmax")
+        xmax.text = str(int(x2))
+        ymax = ET.SubElement(bndbox, "ymax")
+        ymax.text = str(int(y2))
+    
+    # 写入文件
+    xml_path = save_dir / f"{Path(img_filename).stem}.xml"
+    tree = ET.ElementTree(annotation)
+    tree.write(str(xml_path), encoding="utf-8", xml_declaration=True)
 
 @smart_inference_mode()
 def run(
@@ -55,6 +119,7 @@ def run(
         hide_conf=False,
         half=False,
         dnn=False,
+        save_img_frames=False,
         vid_stride=1,
 ):
     source = str(source)
@@ -83,11 +148,20 @@ def run(
     save_dir = increment_path(Path(project) / name, exist_ok=exist_ok)
     (save_dir / 'labels' if save_txt else save_dir).mkdir(parents=True, exist_ok=True)
 
+    if save_img_frames:
+        image_dir = save_dir / 'images'
+        annotations_dir = save_dir / 'annotations'
+        image_dir.mkdir(parents=True, exist_ok=True)
+        annotations_dir.mkdir(parents=True, exist_ok=True)
+
     # Load model
     device = select_device(device)
     model = DetectMultiBackend(weights, device=device, dnn=dnn, data=data, fp16=half)
     stride, names, pt = model.stride, model.names, model.pt
     imgsz = check_img_size(imgsz, s=stride)
+
+    LOGGER.warning(f"Loaded names: {names}")
+    # print(f"Loaded names: {names}", flush=True)
 
     # Dataloader
     bs = 1
@@ -98,7 +172,10 @@ def run(
     elif screenshot:
         dataset = LoadScreenshots(source, img_size=imgsz, stride=stride, auto=pt)
     else:
+        # 如果source是目录
         dataset = LoadImages(source, img_size=imgsz, stride=stride, auto=pt, vid_stride=vid_stride)
+    # initialize video path/writer for saving results (e.g., .mp4 videos) and for streaming results to display
+    # bs: batch size
     vid_path, vid_writer = [None] * bs, [None] * bs
 
     # Run inference
@@ -149,6 +226,36 @@ def run(
             annotator = Annotator(im0, line_width=line_thickness, example=str(names))
             if len(det):
                 det[:, :4] = scale_boxes(im.shape[2:], det[:, :4], im0.shape).round()
+                
+                # 将所有检测结果的类别ID设置为drone_class_id
+                # det: 当前帧经过 NMS 后的检测结果，[x1, y1, x2, y2, conf, cls]
+                try:
+                    # 如果 names 是字典，那么遍历字典的键值对，找到值等于 'drone' 的那个键（即类别ID）
+                    if isinstance(names, dict):
+                        drone_class_id = next(k for k, v in names.items() if v == 'drone')
+                    else:
+                        # 如果 names 是列表，例如 ['person', 'drone', ...]
+                        # 直接返回 'drone' 在列表中的索引（即类别ID）
+                        drone_class_id = names.index('drone')
+                except (StopIteration, ValueError):
+                    LOGGER.warning("Class 'drone' not found in names, using original class ids")
+                else:
+                    print(f"Found drone class ID: {drone_class_id}")
+                    det[:, 5] = drone_class_id
+
+                if save_img_frames:
+                    base_name = f"{p.stem}_frame{frame:06d}"
+                    img_save_path= image_dir / f"{base_name}.jpg"
+                    cv2.imwrite(str(img_save_path), im0)
+
+                    detections_for_xml = []
+                    for *xyxy, conf, cls in reversed(det):
+                        x1, y1, x2, y2 = map(int, xyxy)
+                        class_name = names[int(cls)]
+                        detections_for_xml.append((x1, y1, x2, y2, class_name)) 
+                    h, w = im0.shape[:2]
+
+                    save_voc_xml(annotations_dir, f"{base_name}.jpg", w, h, detections_for_xml, depth=3)
 
                 for c in det[:, 5].unique():
                     n = (det[:, 5] == c).sum()
@@ -203,6 +310,7 @@ def run(
                         vid_writer[i] = cv2.VideoWriter(save_path, cv2.VideoWriter_fourcc(*'mp4v'), fps, (w, h))
                     vid_writer[i].write(im0)
 
+        # Print the sequence of frame and  (inference-only)
         LOGGER.info(f"{s}{'' if len(det) else '(no detections), '}{dt[1].dt * 1E3:.1f}ms")
 
     t = tuple(x.t / seen * 1E3 for x in dt)
@@ -243,6 +351,9 @@ def parse_opt():
     parser.add_argument('--half', action='store_true')
     parser.add_argument('--dnn', action='store_true')
     parser.add_argument('--vid-stride', type=int, default=1)
+    parser.add_argument('--save-img-frames', action='store_true', dest='save_img_frames',
+                        help='save annotated video frames as jpg images')
+
     opt = parser.parse_args()
     opt.imgsz *= 2 if len(opt.imgsz) == 1 else 1
     print_args(vars(opt))
