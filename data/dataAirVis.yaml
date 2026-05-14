@@ -1,23 +1,28 @@
-# Train/val/test sets as 1) dir: path/to/imgs, 2) file: path/to/imgs.txt, or 3) list: [path/to/imgs1, path/to/imgs2, ..]
+# YOLOv5 数据集配置文件：用于告诉训练脚本图片/标签在哪里，以及一共有多少类。
+
+# 训练集图片列表文件。txt 中通常每一行是一张训练图片的路径。
 train: D:/data/YoloTrainVis/dataSet/train.txt
+
+# 验证集图片列表文件。训练过程中用于评估模型效果，不参与参数更新。
 val: D:/data/YoloTrainVis/dataSet/val.txt
 
-# Classes
-nc: 15  # number of classes
-names: [
-'ptarget',
-'bird',
-'drone',
-'fixedWing',
-'plane',
-'helicopter',
-'kite',
-'balloon',
-'vehicle',
-'person',
-'boat',
-'gear',
-'airfoil',
-'airtail',
-'birds'
-]
+# 类别数量，必须和下面 names 中的类别个数一致。
+nc: 15
+
+# 类别名称列表。顺序很重要：标签文件中的类别编号 0-14 会按这里的顺序映射。
+names:
+  - ptarget     # 类别 0：目标/主要目标
+  - bird        # 类别 1：鸟
+  - drone       # 类别 2：无人机
+  - fixedWing   # 类别 3：固定翼飞行器
+  - plane       # 类别 4：飞机
+  - helicopter  # 类别 5：直升机
+  - kite        # 类别 6：风筝
+  - balloon     # 类别 7：气球
+  - vehicle     # 类别 8：车辆
+  - person      # 类别 9：人
+  - boat        # 类别 10：船
+  - gear        # 类别 11：装备/齿轮类目标
+  - airfoil     # 类别 12：翼型/机翼部件
+  - airtail     # 类别 13：尾翼/飞机尾部
+  - birds       # 类别 14：鸟群/复数鸟类
