@@ -34,6 +34,32 @@ from utils.general import (LOGGER, Profile, check_file, check_img_size, check_im
 from utils.torch_utils import select_device, smart_inference_mode
 from utils.voc_incremental import filter_new_videos, mark_video_converted, state_path, write_source_list_txt
 
+def format_video_start_log(path, file_index, file_total, vid_cap):
+    """Build a one-line summary when inference switches to a new video source."""
+    resolved = Path(path).resolve()
+    parts = [f"Start video {file_index}/{file_total}: {resolved.name}", f"path={resolved}"]
+    if vid_cap is not None:
+        frames = int(vid_cap.get(cv2.CAP_PROP_FRAME_COUNT) or 0)
+        fps = float(vid_cap.get(cv2.CAP_PROP_FPS) or 0)
+        width = int(vid_cap.get(cv2.CAP_PROP_FRAME_WIDTH) or 0)
+        height = int(vid_cap.get(cv2.CAP_PROP_FRAME_HEIGHT) or 0)
+        parts.append(f"frames={frames if frames > 0 else 'unknown'}")
+        parts.append(f"fps={fps:.2f}" if fps > 0 else "fps=unknown")
+        parts.append(f"size={width}x{height}" if width > 0 and height > 0 else "size=unknown")
+    return ", ".join(parts)
+
+
+def normalize_source_for_detect(source):
+    """Expand a plain directory source into a recursive glob for detect.py only."""
+    source = str(source)
+    if any(token in source for token in ('*', '?')):
+        return source
+    path = Path(source)
+    if path.is_dir():
+        return str(path / '**' / '*.*')
+    return source
+
+
 def save_voc_xml(save_dir, img_filename, img_width, img_height, detections, depth=3):
     """把一帧的框写成 PASCAL VOC XML；文件名与 jpg stem 一致，便于与 images/ 配对。
 
@@ -98,6 +124,22 @@ def save_voc_xml(save_dir, img_filename, img_width, img_height, detections, dept
     tree = ET.ElementTree(annotation)
     tree.write(str(xml_path), encoding="utf-8", xml_declaration=True)
 
+
+def save_voc_frame_and_xml(image_dir, annotations_dir, base_name, frame_image, detections):
+    """Save the raw video frame plus its VOC XML sidecar.
+
+    Args:
+        image_dir: Target VOC images directory.
+        annotations_dir: Target VOC annotations directory.
+        base_name: Shared file stem for the JPG/XML pair.
+        frame_image: Original BGR frame before any boxes or labels are drawn.
+        detections: [(x1, y1, x2, y2, class_name), ...] in pixel coordinates.
+    """
+    img_save_path = image_dir / f"{base_name}.jpg"
+    h, w = frame_image.shape[:2]
+    cv2.imwrite(str(img_save_path), frame_image)
+    save_voc_xml(annotations_dir, f"{base_name}.jpg", w, h, detections, depth=3)
+
 @smart_inference_mode()
 def run(
         weights,
@@ -109,7 +151,7 @@ def run(
         max_det=1000,
         device='',
         view_img=False,
-        save_txt=False,
+        save_txt=True,
         save_csv=False,
         save_conf=False,
         save_crop=False,
@@ -137,10 +179,10 @@ def run(
     常用开关：conf/iou 调检出敏感度；save_txt 写 YOLO 行标注；save_img_frames 抽帧+VOC XML；
     incremental_mark_voc_root 与 utils.voc_incremental 配合，在批量视频间写「已转换」状态。
     """
-    source = str(source)
+    source = normalize_source_for_detect(source)
 
     # ===================== 无扩展名/写错扩展名时：同 stem 下试常见视频后缀，避免找不到文件 =====================
-    if not Path(source).exists():
+    if '*' not in source and '?' not in source and not Path(source).exists():
         video_exts = ['mp4', 'avi', 'mov', 'mkv', 'flv', 'wmv', 'mpeg', 'mpg']
         folder = Path(source).parent
         name = Path(source).stem
@@ -198,6 +240,16 @@ def run(
     else:
         # 目录/通配/单文件/图片列表等：统一走 LoadImages（mode 会是 image/video）
         dataset = LoadImages(source, img_size=imgsz, stride=stride, auto=pt, vid_stride=vid_stride)
+    if not webcam and not screenshot:
+        source_path = Path(source)
+        if source.endswith('.txt'):
+            LOGGER.info(f'Source list mode: {source}')
+        elif '*' in source:
+            LOGGER.info(f"Source glob mode: {'recursive' if '**' in source else 'non-recursive'} pattern={source}")
+        elif source_path.is_dir():
+            LOGGER.info(f'Source directory mode: recursive dir={source_path.resolve()}')
+        elif source_path.is_file():
+            LOGGER.info(f'Source file mode: single path={source_path.resolve()}')
     # 每路流一个输出路径 + VideoWriter；非视频模式后面几乎不用
     vid_path, vid_writer = [None] * bs, [None] * bs
 
@@ -205,6 +257,7 @@ def run(
     model.warmup(imgsz=(1 if pt or model.triton else bs, 3, *imgsz))
     seen, windows, dt = 0, [], (Profile(), Profile(), Profile())
     prev_video_for_mark = None
+    logged_video_path = None
     for path, im, im0s, vid_cap, s in dataset:
         # 增量模式且 source 为路径列表：每换一条视频文件，把「上一条」标为已处理，防中断丢状态
         if incremental_mark_voc_root is not None and dataset.mode == 'video':
@@ -212,6 +265,11 @@ def run(
             if prev_video_for_mark is not None and curv != prev_video_for_mark:
                 mark_video_converted(incremental_mark_voc_root, Path(prev_video_for_mark))
             prev_video_for_mark = curv
+        if dataset.mode == 'video':
+            current_video_path = str(Path(path).resolve())
+            if current_video_path != logged_video_path:
+                LOGGER.info(format_video_start_log(path, dataset.count + 1, dataset.nf, vid_cap))
+                logged_video_path = current_video_path
         with dt[0]:
             # im:  letterbox 后的 NHWC numpy → NCHW tensor，/255 与训练分布一致
             im = torch.from_numpy(im).to(model.device)
@@ -280,17 +338,19 @@ def run(
                     # 使用「不含扩展名的文件名 + 扩展名」作前缀，降低不同视频同名 stem 冲突；多视频同目录一次跑也会区分
                     vid_tag = f"{p.stem}_{p.suffix[1:].lower()}" if p.suffix else p.stem
                     base_name = f"{vid_tag}_frame{frame:06d}"
-                    img_save_path = image_dir / f"{base_name}.jpg"
-                    # JPG 在下方 box_label 之后写入，保证与 XML 同名的图为「带检测框」预览
 
                     detections_for_xml = []
                     for *xyxy, conf, cls in reversed(det):
                         x1, y1, x2, y2 = map(int, xyxy)
                         class_name = names[int(cls)]
-                        detections_for_xml.append((x1, y1, x2, y2, class_name)) 
-                    h, w = im0.shape[:2]
-
-                    save_voc_xml(annotations_dir, f"{base_name}.jpg", w, h, detections_for_xml, depth=3)
+                        detections_for_xml.append((x1, y1, x2, y2, class_name))
+                    save_voc_frame_and_xml(
+                        image_dir=image_dir,
+                        annotations_dir=annotations_dir,
+                        base_name=base_name,
+                        frame_image=im0.copy(),
+                        detections=detections_for_xml,
+                    )
 
                 for c in det[:, 5].unique():
                     n = (det[:, 5] == c).sum()
@@ -316,9 +376,6 @@ def run(
                         annotator.box_label(xyxy, label, color=colors(c, True))
                     if save_crop:
                         save_one_box(xyxy, imc, file=save_dir / 'crops' / names[c] / f'{p.stem}.jpg', BGR=True)
-
-                if save_img_frames:
-                    cv2.imwrite(str(img_save_path), annotator.result())
 
             # 把框画回 BGR 图；无检测时 annotator 等价原图
             im0 = annotator.result()
