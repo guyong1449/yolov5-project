@@ -1,0 +1,12 @@
+candidate_id: candidate_lr0_002
+description: "Phase 1 demo candidate: lower lr0 and disable mixup"
+base_hyp: data/hyps/hyp.scratch-low.yaml
+cli_overrides:
+  batch_size: 4
+  imgsz: 640
+  workers: 8
+  optimizer: SGD
+  noplots: true
+hyp_overrides:
+  lr0: 0.002
+  mixup: 0.0

@@ -7,6 +7,11 @@ import os
 import warnings
 from pathlib import Path
 
+warnings.filterwarnings(
+    'ignore',
+    message=r'pkg_resources is deprecated as an API\..*',
+    category=UserWarning,
+)
 import pkg_resources as pkg
 import torch
 
@@ -62,12 +67,15 @@ class Loggers():
     # YOLOv5 Loggers class
     def __init__(self, save_dir=None, weights=None, opt=None, hyp=None, logger=None, include=LOGGERS):
         self.save_dir = save_dir
+        self.image_dir = Path(getattr(opt, 'image_dir', Path(save_dir) / 'images'))
         self.weights = weights
         self.opt = opt
         self.hyp = hyp
         self.plots = not opt.noplots  # plot results
         self.logger = logger  # for printing results to console
         self.include = include
+        if self.plots:
+            self.image_dir.mkdir(parents=True, exist_ok=True)
         self.keys = [
             'train/box_loss',
             'train/obj_loss',
@@ -155,8 +163,8 @@ class Loggers():
     def on_pretrain_routine_end(self, labels, names):
         # Callback runs on pre-train routine end
         if self.plots:
-            plot_labels(labels, names, self.save_dir)
-            paths = self.save_dir.glob('*labels*.jpg')  # training labels
+            plot_labels(labels, names, self.image_dir)
+            paths = self.image_dir.glob('*labels*.jpg')  # training labels
             if self.wandb:
                 self.wandb.log({'Labels': [wandb.Image(str(x), caption=x.name) for x in paths]})
             # if self.clearml:
@@ -170,12 +178,12 @@ class Loggers():
         # ni: number integrated batches (since train start)
         if self.plots:
             if ni < 3:
-                f = self.save_dir / f'train_batch{ni}.jpg'  # filename
+                f = self.image_dir / f'train_batch{ni}.jpg'  # filename
                 plot_images(imgs, targets, paths, f)
                 if ni == 0 and self.tb and not self.opt.sync_bn:
                     log_tensorboard_graph(self.tb, model, imgsz=(self.opt.imgsz, self.opt.imgsz))
             if ni == 10 and (self.wandb or self.clearml):
-                files = sorted(self.save_dir.glob('train*.jpg'))
+                files = sorted(self.image_dir.glob('train*.jpg'))
                 if self.wandb:
                     self.wandb.log({'Mosaics': [wandb.Image(str(f), caption=f.name) for f in files if f.exists()]})
                 if self.clearml:
@@ -210,7 +218,7 @@ class Loggers():
     def on_val_end(self, nt, tp, fp, p, r, f1, ap, ap50, ap_class, confusion_matrix):
         # Callback runs on val end
         if self.wandb or self.clearml:
-            files = sorted(self.save_dir.glob('val*.jpg'))
+            files = sorted(self.image_dir.glob('val*.jpg'))
         if self.wandb:
             self.wandb.log({'Validation': [wandb.Image(str(f), caption=f.name) for f in files]})
         if self.clearml:
@@ -268,9 +276,9 @@ class Loggers():
     def on_train_end(self, last, best, epoch, results):
         # Callback runs on training end, i.e. saving best model
         if self.plots:
-            plot_results(file=self.save_dir / 'results.csv')  # save results.png
+            plot_results(file=self.save_dir / 'results.csv', output_dir=self.image_dir)  # save results.png
         files = ['results.png', 'confusion_matrix.png', *(f'{x}_curve.png' for x in ('F1', 'PR', 'P', 'R'))]
-        files = [(self.save_dir / f) for f in files if (self.save_dir / f).exists()]  # filter
+        files = [(self.image_dir / f) for f in files if (self.image_dir / f).exists()]  # filter
         self.logger.info(f"Results saved to {colorstr('bold', self.save_dir)}")
 
         if self.tb and not self.clearml:  # These images are already captured by ClearML by now, we don't want doubles

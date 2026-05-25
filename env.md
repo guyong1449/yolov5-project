@@ -1,6 +1,6 @@
 # 当前环境配置
 
-更新时间：2026-05-13  
+更新时间：2026-05-20  
 主机：当前 Windows 机器  
 仓库路径：`F:\1\yolov5-master`  
 默认说明语言：中文
@@ -11,7 +11,7 @@
 
 | 项目 | 当前命中路径 | 主安装目录 | 说明 |
 | --- | --- | --- | --- |
-| `git` | `D:\Apps\Git\cmd\git.exe` | `D:\Apps\Git` | 已迁到 `D:` |
+| `git` | `C:\Program Files\Git\cmd\git.exe` | `C:\Program Files\Git` | 已迁回 `C:` |
 | `python` | `C:\Users\admin\AppData\Local\Programs\Python\Python313\python.exe` | `C:\Users\admin\AppData\Local\Programs\Python\Python313` | 默认 `python` 仍是系统 Python |
 | `py` | `C:\Users\admin\AppData\Local\Programs\Python\Launcher\py.exe` | `C:\Users\admin\AppData\Local\Programs\Python\Launcher` | Python Launcher |
 | `conda` | `D:\Miniconda3\Scripts\conda.exe` | `D:\Miniconda3` | 已迁到 `D:` |
@@ -52,12 +52,6 @@
 - `py38 -> D:\Miniconda3\envs\py38`
 - `yolo -> D:\Miniconda3\envs\yolo`
 
-补充：
-
-- `D:\Miniconda3\envs\py38\python.exe` 存在，可正常作为独立环境使用
-- `D:\Miniconda3\envs\yolo\python.exe` 不存在
-- 当前 `yolo` 只是一个已登记但不完整的环境目录，不能当成完整 Python 环境使用
-
 ### 2.2 系统 Python
 
 - 安装目录：`C:\Users\admin\AppData\Local\Programs\Python\Python313`
@@ -80,12 +74,12 @@ global.index-url='https://mirrors.ustc.edu.cn/pypi/web/simple'
 
 ## 3. Git
 
-- 安装目录：`D:\Apps\Git`
-- 当前命中：`D:\Apps\Git\cmd\git.exe`
+- 安装目录：`C:\Program Files\Git`
+- 当前命中：`C:\Program Files\Git\cmd\git.exe`
 
 当前主要配置来源：
 
-- `D:\Apps\Git\etc\gitconfig`
+- `C:\Program Files\Git\etc\gitconfig`
 - `C:\Users\admin\.gitconfig`
 - `F:\1\yolov5-master\.git\config`
 
@@ -158,7 +152,7 @@ global.index-url='https://mirrors.ustc.edu.cn/pypi/web/simple'
 | --- | --- | --- |
 | Claude Code | `D:\Apps\ClaudeCode` | 已迁到 `D:` |
 | Obsidian | `D:\Apps\Obsidian` | 已迁到 `D:` |
-| Git | `D:\Apps\Git` | 已迁到 `D:` |
+| Git | `C:\Program Files\Git` | 已迁回 `C:` |
 | Miniconda | `D:\Miniconda3` | 已迁到 `D:` |
 | Python 3.13 | `C:\Users\admin\AppData\Local\Programs\Python\Python313` | 仍在 `C:` |
 | PyCharm Community 2024.2.3 | `C:\Program Files\JetBrains\PyCharm Community Edition 2024.2.3` | 仍在 `C:` |

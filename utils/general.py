@@ -7,6 +7,7 @@ import contextlib
 import glob
 import inspect
 import logging
+import warnings
 import logging.config
 import math
 import os
@@ -31,6 +32,17 @@ from zipfile import ZipFile, is_zipfile
 import cv2
 import numpy as np
 import pandas as pd
+
+warnings.filterwarnings(
+    'ignore',
+    message=r'pkg_resources is deprecated as an API\..*',
+    category=UserWarning,
+)
+warnings.filterwarnings(
+    'ignore',
+    message=r'`torch\.cuda\.amp\.autocast\(args\.\.\.\)` is deprecated\..*',
+    category=FutureWarning,
+)
 import pkg_resources as pkg
 import torch
 import torchvision
@@ -978,7 +990,7 @@ def non_max_suppression(
 
 def strip_optimizer(f='best.pt', s=''):  # from utils.general import *; strip_optimizer()
     # Strip optimizer from 'f' to finalize training, optionally save as 's'
-    x = torch.load(f, map_location=torch.device('cpu'))
+    x = torch.load(f, map_location=torch.device('cpu'), weights_only=False)
     if x.get('ema'):
         x['model'] = x['ema']  # replace model with ema
     for k in 'optimizer', 'best_fitness', 'ema', 'updates':  # keys

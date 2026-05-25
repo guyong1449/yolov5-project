@@ -1,5 +1,37 @@
 # 视频抽帧数据的人审清洗与误差分析方案
 
+## 0. `test1_stride10` 训练链路现状对照
+
+这部分用于冻结当前训练链路证据，避免把不同代码状态、不同训练目录和不同优化器路径混成一个“baseline”。
+
+| 条目 | 代码状态 | 命令 / 入口 | 优化器 / hyp | AMP 入口 | 首批次 loss | 结果目录 | 日志目录 | 当前结论 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 历史 `baseline` | 历史代码 | `train.py` 直跑，旧命令 | SGD / 默认配置 | `autocast("cuda", enabled=amp)` | 未进入稳定训练 | 历史目录，待清理 | 历史目录，待清理 | 旧代码在 `autocast` 处报错，不能作为当前代码基线 |
+| 历史 `AdamW` | 当前磁盘代码早期阶段 | `run_with_log -> train.py` | AdamW / `data/hyps/hyp.adamw.yaml` | `autocast(amp)` | `nan` | 历史目录，待清理 | 历史目录，待清理 | 即使带 `hyp.adamw.yaml`，仍从首批次开始 `nan` |
+| 历史 `SGD smoke` | 当前磁盘代码早期阶段 | 旧 smoke 命令 | SGD / smoke 配置 | `autocast(amp)` | 有限值 | 历史目录，待清理 | 历史目录，待清理 | 仅作为曾经可跑通的证据，不再作为保留主线 |
+| 当前保留主线 | 当前磁盘代码 | `run_with_log -> train.py` | SGD / `hyp.scratch-low.yaml` | 默认 `amp=False`，仅 `--amp` 才启用 | 已在当前磁盘状态下跑通 | `runs/train/test1_stride10_sgd_70e3/` | `runs/train/test1_stride10_sgd_70e3/run.*` | 当前只保留这一条训练主线，后续记录与复盘都以它为准 |
+
+当前执行约定：
+
+- 命令日志统一写 `runs/train/<run_name>/run.*`
+- 训练产物统一写 `runs/train/<run_name>/`
+- 训练图片统一写 `runs/train/<run_name>/images/`
+- `runs/train/logs/*.log` 与 `runs/logs/*.log` 仅作为历史残留，后续不再继续追加新日志
+
+后续重跑顺序固定为：
+
+1. `SGD 1 epoch smoke`
+2. `SGD 5 epoch short run`
+3. `AdamW 1 epoch smoke`
+
+只有在 `AdamW 1 epoch smoke` 首批次 loss 为有限值时，才考虑继续短跑或长跑。
+
+当前已确认的修复结论：
+
+- 当前 `train.py` 默认禁用 AMP，只有显式传 `--amp` 才会开启混合精度。
+- `runs/train/test1_stride10_sgd_smoke_noamp_v1/` 已证明同数据、同权重、同 `hyp.scratch-low.yaml` 在禁用 AMP 后可得到有限 loss 和非零验证指标。
+- 当前文档层面的唯一保留训练目录是 `runs/train/test1_stride10_sgd_70e3/`，旧实验目录与旧日志目录都不再作为推荐入口。
+
 ## 1. 目标定义
 
 你现在的任务其实包含两件事，而且这两件事最好分开设计：

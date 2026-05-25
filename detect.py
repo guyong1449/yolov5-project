@@ -433,7 +433,7 @@ def parse_opt():
     parser.add_argument('--conf-thres', type=float, default=0.25)  # 置信度阈值：越高框越少
     parser.add_argument('--iou-thres', type=float, default=0.45)  # NMS IoU：越高越保留邻近框
     parser.add_argument('--device', default='0', help='cuda device 0')  # GPU
-    parser.add_argument('--view-img', default=True, action='store_true', help='show results')  # 实时画面
+    parser.add_argument('--view-img', action='store_true', help='show live preview windows (cv2.imshow); off by default')
     parser.add_argument('--save-txt', action='store_true')
     parser.add_argument('--save-csv', action='store_true')
     parser.add_argument('--save-conf', action='store_true')

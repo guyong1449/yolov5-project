@@ -1,5 +1,25 @@
 # AGENTS.md
 
+## 最近任务
+
+1. 查找 YOLOv5 训练相关论文，优化模型结构，加快训练速度。
+2. 将相关代码改为在 LabelImg 标注时能查看到置信度。
+3. 训练时能查看样本对于整体模型具有正效用还是负效应。
+
+## 0. 环境操作红线
+
+- 未经用户在当前回合明确授权，禁止改动 Python/Conda 环境。
+- 未经用户在当前回合明确授权，禁止执行以下操作：
+  - `conda create`
+  - `conda remove`
+  - `conda env remove`
+  - `conda create --clone`
+  - `pip install`
+  - `pip uninstall`
+  - 持久化修改 PATH、解释器绑定、环境变量
+  - 用其他环境替换当前项目解释器
+- 若环境疑似损坏，先给出证据和修复方案；只有在用户明确同意后，才能实际执行环境修复。
+
 ## 1. 项目基础信息
 
 - 项目类型：目标检测（YOLOv5，PyTorch 单阶段检测）。
@@ -25,15 +45,15 @@
 ### 核心约束
 
 - 训练/验证尽量固定随机种子。
-  - 本仓库 `train.py` 支持 `--seed`，默认显式传参，不依赖默认值。
+  - `train.py` 支持 `--seed`，运行时显式传参。
 - 数据集配置以 `data/*.yaml` 为准。
-  - 本仓库已存在 `data/dataAirVis.yaml`。
+  - 当前数据配置文件包含 `data/dataAirVis.yaml`。
   - 修改数据路径、类别数、类名时，先检查 YAML 中的 `train`、`val`、`nc`、`names`。
 - 预训练权重来源必须写清：
   - 官方权重：如 `yolov5s.pt`
   - 用户自备权重：如 `checkpoint/yolov5_best.pt`
 - 不假设脚本默认参数可靠。
-  - 本仓库存在分支级本地定制，运行时优先显式传 `--data`、`--weights`、`--source`、`--device`、`--project`、`--name`。
+  - 运行时优先显式传 `--data`、`--weights`、`--source`、`--device`、`--project`、`--name`。
 
 ## 2. 环境搭建与开发流程
 
@@ -59,15 +79,15 @@ pip install -r requirements.txt
 
 ### 解释器与命令执行
 
-- 本机默认 `python` 可能指向系统解释器，不默认等同于本项目可用解释器。
-- 当前已验证可用于本仓库检查与测试的解释器路径：`D:\Miniconda3\python.exe`
+- 默认 `python` 命中系统解释器：`C:\Users\admin\AppData\Local\Programs\Python\Python313\python.exe`。
+- `D:\Miniconda3\python.exe` 可用于本仓库检查与测试。
 - 当需要确认依赖、运行单元测试、或执行仓库脚本时，优先显式使用：
 
 ```bash
 D:\Miniconda3\python.exe -m unittest tests.test_detect_source_behavior
 ```
 
-- 若用户只写 `python ...`，先核对实际命中的解释器；不要假设系统默认 `python` 已具备 `torch`、`psutil`、`opencv-python` 等本项目依赖。
+- 若用户只写 `python ...`，先核对实际命中的解释器；不要假设默认 `python` 已具备 `torch`、`psutil`、`opencv-python` 等本项目依赖。
 
 ### 数据准备
 
@@ -116,7 +136,7 @@ python train.py --data data/dataAirVis.yaml --weights "" --cfg models/yolov5s.ya
 
 ### 推理
 
-本仓库 `detect.py` 有本地定制参数，推理时必须显式传参：
+`detect.py` 含本地定制参数，推理时必须显式传参：
 
 ```bash
 python detect.py --weights checkpoint/yolov5_best.pt --source "F:/1/video/output" --imgsz 640 --device 0 --project runs/detect --name demo_exp
@@ -125,7 +145,7 @@ python detect.py --weights checkpoint/yolov5_best.pt --source "F:/1/video/output
 常用参数：
 
 - `--source`：图片、视频、摄像头、`.txt` 路径列表，或显式 glob 模式
-- 当前本仓库 `detect.py` 会对普通目录 `--source` 自动递归扫描，等效于把目录展开成 `目录/**/*.*` 后再交给 YOLOv5 过滤支持格式
+- `detect.py` 会对普通目录 `--source` 自动递归扫描，等效于把目录展开成 `目录/**/*.*` 后再交给 YOLOv5 过滤支持格式
 - 若只想限定某一类文件，仍可显式传 glob，例如 `F:/1/video/output/**/*.mp4`
 - `--weights`：推理权重
 - `--imgsz`：推理输入尺寸
@@ -166,11 +186,11 @@ python export.py --weights checkpoint/yolov5_best.pt --imgsz 640 640 --device 0 
 
 ## 3. 测试规范
 
-### 当前仓库测试形态
+### 仓库测试形态
 
-- 已存在 `tests/`
-- 已存在 `setup.cfg` 中的 pytest 配置
-- 当前最直接的自动化测试入口可用：
+- `tests/` 目录存在
+- `setup.cfg` 含 pytest 配置
+- 自动化测试入口：
 
 ```bash
 pytest tests/
