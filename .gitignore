@@ -260,3 +260,11 @@ crashlytics.properties
 crashlytics-build.properties
 fabric.properties
 nul
+
+# Cursor / IDE local files
+.cursor/
+.cursorindexingignore
+.specstory/
+
+# Logs
+logs/

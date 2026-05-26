@@ -8,12 +8,9 @@ from pathlib import Path
 import sys
 
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
-
-from tools.label_tools import _load_names
-
 
 REPORT_COLUMNS = (
     "image_path",
@@ -87,6 +84,8 @@ def _read_image_size(image_path: Path) -> tuple[int, int]:
 def load_allowed_classes(data_yaml: Path | None, cli_allowed_classes: list[str]) -> set[str] | None:
     allowed = set(cli_allowed_classes)
     if data_yaml is not None:
+        from tools.label_tools import _load_names
+
         allowed.update(_load_names(Path(data_yaml)).keys())
     return allowed or None
 

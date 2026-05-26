@@ -16,7 +16,7 @@ cd /f/1/yolov5-master
 D:/Miniconda3/python.exe scripts/run_with_log.py -- \
   D:/Miniconda3/python.exe train.py \
   --data F:/1/labelimg/data/test1_stride10/data.yaml \
-  --weights checkpoint/yolov5_best.pt \
+  --weights F:\1\yolov5-master\runs\train\test1_stride10_sgd_70e3\weights\best.pt \
   --epochs 70 \
   --batch-size 4 \
   --imgsz 640 \
@@ -74,8 +74,28 @@ D:/Miniconda3/python.exe detect.py \
 D:/Miniconda3/python.exe scripts/extract_voc_stride10.py \
   --weights checkpoint/yolov5_best.pt \
   --source "F:/1/video/output" \
-  --voc-root F:/1/labelimg/data/test1_stride10 \
+  --voc-root F:/1/labelimg/data/test2_stride10 \
   --data-yaml F:/1/labelimg/data/test1_stride10/data.yaml \
   --device 0
 ```
 
+## FiftyOne 连续去重
+
+完整说明见：
+
+- [fiftyone-dedup-workflow.md](/abs/path/F:/1/yolov5-master/docs/fiftyone-dedup-workflow.md)
+
+主命令：
+
+```powershell
+D:\Miniconda3\envs\fiftyone312\python.exe tools\fiftyone\fiftyone_run_full_dedup_pipeline.py `
+  --dataset-name test1_stride10_voc `
+  --model clip-vit-base32-torch `
+  --brain-key clip_vit_base32_sim `
+  --approx-threshold 0.12 `
+  --approx-group-keep-ratio 0.3 `
+  --voc-root "F:\1\labelimg\data\test1_stride10\fiftyone_voc" `
+  --export-dir "F:\1\labelimg\data\test1_stride10\fiftyone_voc_deduped" `
+  --report-dir "F:\1\labelimg\data\test1_stride10\fiftyone_voc\dedup_reports" `
+  --overwrite
+```
