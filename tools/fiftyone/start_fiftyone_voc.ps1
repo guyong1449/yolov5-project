@@ -1,7 +1,7 @@
 $ErrorActionPreference = "Stop"
 
 $projectRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
-$pythonExe = "D:\Miniconda3\envs\fiftyone312\python.exe"
+$pythonExe = "D:\Miniconda3\envs\f312\python.exe"
 $importScript = Join-Path $projectRoot "tools\fiftyone\fiftyone_import_voc.py"
 $dataDir = "F:\1\labelimg\data\test1_stride10\fiftyone_voc\data"
 $labelsDir = "F:\1\labelimg\data\test1_stride10\fiftyone_voc\labels"

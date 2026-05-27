@@ -1,6 +1,6 @@
 # 当前环境配置
 
-更新时间：2026-05-20  
+更新时间：2026-05-26  
 主机：当前 Windows 机器  
 仓库路径：`F:\1\yolov5-master`  
 默认说明语言：中文
@@ -49,8 +49,8 @@
 当前 `conda env list`：
 
 - `base -> D:\Miniconda3`
+- `f312 -> D:\Miniconda3\envs\f312`（Python 3.12.13，torch 2.12.0+cu126，fiftyone 1.15.0）
 - `py38 -> D:\Miniconda3\envs\py38`
-- `yolo -> D:\Miniconda3\envs\yolo`
 
 ### 2.2 系统 Python
 

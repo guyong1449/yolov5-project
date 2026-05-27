@@ -24,13 +24,13 @@
 
 ## 环境
 
-- 真实运行：`D:\Miniconda3\envs\fiftyone312\python.exe`
+- 真实运行：`D:\Miniconda3\envs\f312\python.exe`
 - 单测运行：`D:\Miniconda3\envs\yolo\Scripts\python.exe -m unittest tests.test_fiftyone_tools`
 
 ## 主命令
 
 ```powershell
-D:\Miniconda3\envs\fiftyone312\python.exe tools\fiftyone\fiftyone_run_full_dedup_pipeline.py `
+D:\Miniconda3\envs\f312\python.exe tools\fiftyone\fiftyone_run_full_dedup_pipeline.py `
   --dataset-name test1_stride10_voc `
   --model clip-vit-base32-torch `
   --brain-key clip_vit_base32_sim `
@@ -57,7 +57,7 @@ D:\Miniconda3\envs\fiftyone312\python.exe tools\fiftyone\fiftyone_run_full_dedup
 ### 导入 VOC
 
 ```powershell
-D:\Miniconda3\envs\fiftyone312\python.exe tools\fiftyone\fiftyone_import_voc.py `
+D:\Miniconda3\envs\f312\python.exe tools\fiftyone\fiftyone_import_voc.py `
   --name test1_stride10_voc `
   --data-dir "F:\1\labelimg\data\test1_stride10\fiftyone_voc\data" `
   --labels-dir "F:\1\labelimg\data\test1_stride10\fiftyone_voc\labels" `
@@ -67,7 +67,7 @@ D:\Miniconda3\envs\fiftyone312\python.exe tools\fiftyone\fiftyone_import_voc.py 
 ### 计算相似度
 
 ```powershell
-D:\Miniconda3\envs\fiftyone312\python.exe tools\fiftyone\fiftyone_compute_similarity.py `
+D:\Miniconda3\envs\f312\python.exe tools\fiftyone\fiftyone_compute_similarity.py `
   --dataset-name test1_stride10_voc `
   --model clip-vit-base32-torch `
   --brain-key clip_vit_base32_sim `
@@ -77,7 +77,7 @@ D:\Miniconda3\envs\fiftyone312\python.exe tools\fiftyone\fiftyone_compute_simila
 ### 单独去重导出
 
 ```powershell
-D:\Miniconda3\envs\fiftyone312\python.exe tools\fiftyone\fiftyone_deduplicate_dataset.py `
+D:\Miniconda3\envs\f312\python.exe tools\fiftyone\fiftyone_deduplicate_dataset.py `
   --dataset-name test1_stride10_voc `
   --export-dir "F:\1\labelimg\data\test1_stride10\fiftyone_voc_deduped" `
   --report-dir "F:\1\labelimg\data\test1_stride10\fiftyone_voc\dedup_reports" `

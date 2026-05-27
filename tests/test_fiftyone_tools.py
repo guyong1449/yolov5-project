@@ -35,7 +35,7 @@ class TestFiftyOneTools(unittest.TestCase):
 
         contents = script_path.read_text(encoding="utf-8")
 
-        self.assertIn("D:\\Miniconda3\\envs\\fiftyone312\\python.exe", contents)
+        self.assertIn("D:\\Miniconda3\\envs\\f312\\python.exe", contents)
         self.assertIn("tools\\fiftyone\\fiftyone_import_voc.py", contents)
         self.assertIn("F:\\1\\labelimg\\data\\test1_stride10\\fiftyone_voc\\data", contents)
         self.assertIn("F:\\1\\labelimg\\data\\test1_stride10\\fiftyone_voc\\labels", contents)
