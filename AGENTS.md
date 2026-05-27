@@ -2,15 +2,23 @@
 
 ## 项目范围
 
-- 当前主线是 YOLOv5 目标检测。
+- 当前主线是 YOLOv5 目标检测, 针对无人机、鸟类、飞行器等等小目标。
 - 常用入口：`train.py`、`detect.py`、`val.py`、`export.py`
 - 当前仓库内数据配置：`data/dataAirVis.yaml`
 - 当前主权重：`checkpoint/yolov5_best.pt`
+
+## 当前任务
+1. 加入tracking增强连续目标跨帧检测
+2. 加入适合yolo检测小目标的额外头
 
 ## 当前辅助流程
 
 - FiftyOne 去重流程说明见 [docs/fiftyone-dedup-workflow.md](/abs/path/F:/1/yolov5-master/docs/fiftyone-dedup-workflow.md)
 - `ssh 189` 本机代理中转说明见 [docs/189-mihomo-usage.txt](/abs/path/F:/1/yolov5-master/docs/189-mihomo-usage.txt)
+- GUI 面板架构说明见 [docs/gui-panel/architecture.md](/abs/path/F:/1/yolov5-master/docs/gui-panel/architecture.md)
+- GUI 面板任务规格见 [docs/gui-panel/task-specs.md](/abs/path/F:/1/yolov5-master/docs/gui-panel/task-specs.md)
+- GUI 面板 FiftyOne 集成见 [docs/gui-panel/fiftyone-integration.md](/abs/path/F:/1/yolov5-master/docs/gui-panel/fiftyone-integration.md)
+- GUI 面板启动方式见 [docs/gui-panel/startup.md](/abs/path/F:/1/yolov5-master/docs/gui-panel/startup.md)
 
 ## 红线
 

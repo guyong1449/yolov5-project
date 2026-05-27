@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>YOLOv5 GUI Panel</title>
+    <link rel="stylesheet" href="/static/styles.css?v=6" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar">
+        <div class="sidebar-header">
+          <h1>YOLOv5 Panel</h1>
+          <p>单任务执行，多任务面板</p>
+        </div>
+        <div id="task-cards" class="task-cards"></div>
+      </aside>
+      <main class="main-panel">
+        <section class="toolbar">
+          <div>
+            <h2 id="task-title">加载中...</h2>
+            <p id="task-description" class="muted"></p>
+          </div>
+          <div>
+            <div id="task-status" class="status-pill">idle</div>
+            <p id="task-pid" class="muted" style="margin:4px 0 0;font-size:12px;"></p>
+          </div>
+        </section>
+        <section id="task-form" class="task-form"></section>
+      </main>
+    </div>
+    <section class="log-panel">
+      <div class="log-header">
+        <div>
+          <h3>Terminal Output</h3>
+          <p id="log-meta" class="muted copyable-text">等待任务启动</p>
+        </div>
+        <div class="header-actions">
+          <button id="copy-log-path-btn" type="button" class="secondary">复制日志路径</button>
+          <button id="copy-log-btn" type="button" class="secondary">复制日志内容</button>
+          <button id="clear-log-btn" type="button">清空面板日志</button>
+        </div>
+      </div>
+      <pre id="log-output" class="log-output"></pre>
+    </section>
+    <script src="/static/app.js?v=6"></script>
+  </body>
+</html>

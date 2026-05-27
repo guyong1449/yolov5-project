@@ -54,7 +54,9 @@ D:/Miniconda3/python.exe detect.py \
   --vid-stride 10 \
   --save-img-frames \
   --nosave \
-  --incremental-mp4
+  --incremental-mp4 \
+  --conf-thres 0.25 \
+  --iou-thres 0.45
 ```
 
 产出目录（`--voc-root` 下）：
@@ -62,13 +64,25 @@ D:/Miniconda3/python.exe detect.py \
 - `F:/1/labelimg/data/test1_stride10/images/*.jpg`：无框原始帧
 - `F:/1/labelimg/data/test1_stride10/annotations/*.xml`：PASCAL VOC 初始框（需人工复核后才可当训练真值）
 
+保存策略：
+
+- 仅当「stride 采样后的该帧」**至少有一个检测框**时才写入 JPG + XML；无目标的采样帧不落盘（省磁盘，适合伪标签流程）。
+
 说明：
 
 - **默认不弹窗预览**；需要 `cv2.imshow` 实时看画面时再显式加 `--view-img`
 - `--source` 为目录时，本仓库会递归扫描其下支持的视频后缀；目录已存在则向同一 `images/`、`annotations/` **追加**写入
 - `--nosave`：不在 `runs/detect/...` 再落带框预览图/视频，避免与 VOC 目录混淆
 - `--incremental-mp4`：只转换状态文件中尚未记录的视频（状态见 `{voc-root}/.yolov5_mp4_convert_state.json`）；首次全量导出可去掉该参数
-- 也可用封装脚本（默认 `--vid-stride 10`）：
+- `--voc-root` 应与 `--data` 指向的数据集根目录一致（与 `train.txt` 同级）；GUI 面板 Detect 任务默认已按此配置
+- **GUI 面板**（`tools/gui_panel`）Detect 默认：`vid_stride=10`、`save_img_frames`、`incremental_mp4`、`nosave`、`name=voc_stride10`，`voc_root` 与 `data/dataAirVis.yaml` 对应数据集根一致
+
+### conf / iou（全局，四类共用一组阈值）
+
+- **`--conf-thres`**：置信度低于该值的框在 NMS 前丢弃。伪标签抽帧可先试 **0.25**；drone / ptarget 偏小易漏检时用 **0.20~0.25**；bird 误检多时用 **0.30~0.35**。不能在同一趟 detect 里为各类设不同 conf（除非分次跑 `--classes`）。
+- **`--iou-thres`**：NMS 用。两框 IoU（交集面积 ÷ 并集面积）超过该阈值时，保留高 conf、去掉重叠的低 conf 框，用于去掉同一目标的重复框。默认 **0.45** 即可；密集小目标可试 **0.40~0.50**。
+
+也可用封装脚本（默认 `--vid-stride 10`）：
 
 ```bash
 D:/Miniconda3/python.exe scripts/extract_voc_stride10.py \
@@ -88,7 +102,7 @@ D:/Miniconda3/python.exe scripts/extract_voc_stride10.py \
 主命令：
 
 ```powershell
-D:\Miniconda3\envs\fiftyone312\python.exe tools\fiftyone\fiftyone_run_full_dedup_pipeline.py `
+D:\Miniconda3\envs\f312\python.exe tools\fiftyone\fiftyone_run_full_dedup_pipeline.py `
   --dataset-name test1_stride10_voc `
   --model clip-vit-base32-torch `
   --brain-key clip_vit_base32_sim `
