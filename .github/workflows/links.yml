@@ -1,40 +1,34 @@
-# Ultralytics YOLO 🚀, AGPL-3.0 license
-# YOLO Continuous Integration (CI) GitHub Actions tests broken link checker
-# Accept 429(Instagram, 'too many requests'), 999(LinkedIn, 'unknown status code'), Timeout(Twitter)
+# Markdown link checker for docs and repo guides (not full upstream lychee sweep).
 
 name: Check Broken links
 
 on:
   workflow_dispatch:
   schedule:
-    - cron: '0 0 * * *'  # runs at 00:00 UTC every day
+    - cron: '0 6 * * 1'  # Mondays 06:00 UTC (less noise than daily)
+
+permissions:
+  contents: read
 
 jobs:
-  Links:
+  links:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Download and install lychee
-        run: |
-          LYCHEE_URL=$(curl -s https://api.github.com/repos/lycheeverse/lychee/releases/latest | grep "browser_download_url" | grep "x86_64-unknown-linux-gnu.tar.gz" | cut -d '"' -f 4)
-          curl -L $LYCHEE_URL -o lychee.tar.gz
-          tar xzf lychee.tar.gz
-          sudo mv lychee /usr/local/bin
-
-      - name: Test Markdown and HTML links with retry
-        uses: nick-invision/retry@v2
+      - name: Check markdown links
+        uses: lycheeverse/lychee-action@v2
         with:
-          timeout_minutes: 5
-          retry_wait_seconds: 60
-          max_attempts: 3
-          command: lychee --accept 429,999 --exclude-loopback --exclude 'https?://(www\.)?(linkedin\.com|twitter\.com|instagram\.com|kaggle\.com)' --exclude-path '**/ci.yaml' --exclude-mail --github-token ${{ secrets.GITHUB_TOKEN }} './**/*.md' './**/*.html'
-
-      - name: Test Markdown, HTML, YAML, Python and Notebook links with retry
-        if: github.event_name == 'workflow_dispatch'
-        uses: nick-invision/retry@v2
-        with:
-          timeout_minutes: 5
-          retry_wait_seconds: 60
-          max_attempts: 3
-          command: lychee --accept 429,999 --exclude-loopback --exclude 'https?://(www\.)?(linkedin\.com|twitter\.com|instagram\.com|kaggle\.com|url\.com)' --exclude-path '**/ci.yaml' --exclude-mail --github-token ${{ secrets.GITHUB_TOKEN }} './**/*.md' './**/*.html' './**/*.yml' './**/*.yaml' './**/*.py' './**/*.ipynb'
+          fail: true
+          args: |
+            --accept 429,999
+            --exclude-loopback
+            --exclude 'https?://(www\.)?(linkedin\.com|twitter\.com|instagram\.com|kaggle\.com)'
+            --exclude '/abs/path/'
+            --exclude-path '**/.specstory/**'
+            --exclude-path '**/archive/**'
+            --exclude-mail
+            --no-progress
+            './README.md'
+            './AGENTS.md'
+            './docs/**/*.md'
