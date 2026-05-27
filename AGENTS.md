@@ -14,7 +14,7 @@
 ## 当前辅助流程
 
 - FiftyOne 去重流程说明见 [docs/fiftyone-dedup-workflow.md](/abs/path/F:/1/yolov5-master/docs/fiftyone-dedup-workflow.md)
-- `ssh 189` 本机代理中转说明见 [docs/189-mihomo-usage.txt](/abs/path/F:/1/yolov5-master/docs/189-mihomo-usage.txt)
+- `ssh 189` 本机代理中转见 [docs/189-mihomo-usage.md](docs/189-mihomo-usage.md)；GitHub SSH 排查见 [docs/189-github-ssh.md](docs/189-github-ssh.md)
 - GUI 面板架构说明见 [docs/gui-panel/architecture.md](/abs/path/F:/1/yolov5-master/docs/gui-panel/architecture.md)
 - GUI 面板任务规格见 [docs/gui-panel/task-specs.md](/abs/path/F:/1/yolov5-master/docs/gui-panel/task-specs.md)
 - GUI 面板 FiftyOne 集成见 [docs/gui-panel/fiftyone-integration.md](/abs/path/F:/1/yolov5-master/docs/gui-panel/fiftyone-integration.md)

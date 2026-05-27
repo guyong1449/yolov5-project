@@ -1,13 +1,14 @@
 ---
 name: ssh-189-local-proxy
-description: 用于当前仓库里 ssh 别名 189 借用本机代理出网的流程。用户提到 189、ikuuu、反向隧道、本机代理、中转订阅更新、让 189 访问外网时必须使用。优先复用 docs/189-mihomo-usage.txt 和 tools/ssh_189/，不要重新组织一套新步骤。
+description: 用于当前仓库里 ssh 别名 189 借用本机代理出网的流程。用户提到 189、ikuuu、反向隧道、本机代理、中转订阅更新、让 189 访问外网时必须使用。优先复用 docs/189-mihomo-usage.md、docs/189-github-ssh.md 和 tools/ssh_189/，不要重新组织一套新步骤。
 ---
 
 # SSH 189 Local Proxy
 
 适用前先读：
 
-- `docs/189-mihomo-usage.txt`
+- `docs/189-mihomo-usage.md`
+- `docs/189-github-ssh.md`（GitHub SSH / DNS / 密钥区分）
 
 执行规则：
 
