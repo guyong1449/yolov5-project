@@ -35,6 +35,18 @@ warnings.filterwarnings('ignore', message='User provided device_type of \'cuda\'
 warnings.filterwarnings('ignore', category=UserWarning)
 
 
+def _torch_npu_module():
+    try:
+        import torch_npu  # noqa: F401
+        return torch_npu
+    except ImportError:
+        return None
+
+
+def _npu_is_available():
+    return _torch_npu_module() is not None and hasattr(torch, 'npu') and torch.npu.is_available()
+
+
 def smart_inference_mode(torch_1_9=check_version(torch.__version__, '1.9.0')):
     # Applies torch.inference_mode() decorator if torch>=1.9.0 else torch.no_grad() decorator
     def decorate(fn):
@@ -108,17 +120,38 @@ def device_count():
 def select_device(device='', batch_size=0, newline=True):
     # device = None or 'cpu' or 0 or '0' or '0,1,2,3'
     s = f'YOLOv5 🚀 {git_describe() or file_date()} Python-{platform.python_version()} torch-{torch.__version__} '
-    device = str(device).strip().lower().replace('cuda:', '').replace('none', '')  # to string, 'cuda:0' to '0'
+    device = str(device).strip().lower().replace('none', '')
+    npu = device.startswith('npu')
+    if not npu:
+        device = device.replace('cuda:', '')  # to string, 'cuda:0' to '0'
     cpu = device == 'cpu'
     mps = device == 'mps'  # Apple Metal Performance Shaders (MPS)
     if cpu or mps:
         os.environ['CUDA_VISIBLE_DEVICES'] = '-1'  # force torch.cuda.is_available() = False
+    elif npu:
+        os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
+        requested = device.split(':', 1)[1] if ':' in device else '0'
+        requested = requested.strip() or '0'
+        assert ',' not in requested, "NPU '--device' currently supports a single card only, e.g. --device npu:0"
+        assert requested.isdigit(), f"Invalid NPU '--device {device}' requested, use '--device npu:0'"
+        assert _npu_is_available(), \
+            "Invalid NPU '--device' requested, torch_npu is not available or torch.npu.is_available() is False"
+        index = int(requested)
+        count = torch.npu.device_count()
+        assert count > index, f"Invalid NPU '--device {device}' requested, only {count} NPU device(s) available"
+        if batch_size > 0:
+            assert batch_size % 1 == 0, f'batch-size {batch_size} not supported by requested NPU configuration'
     elif device:  # non-cpu device requested
         os.environ['CUDA_VISIBLE_DEVICES'] = device  # set environment variable - must be before assert is_available()
         assert torch.cuda.is_available() and torch.cuda.device_count() >= len(device.replace(',', '')), \
             f"Invalid CUDA '--device {device}' requested, use '--device cpu' or pass valid CUDA device(s)"
 
-    if not cpu and not mps and torch.cuda.is_available():  # prefer GPU if available
+    if npu:
+        device_name_fn = getattr(torch.npu, 'get_device_name', None)
+        device_name = device_name_fn(index) if callable(device_name_fn) else f'NPU:{index}'
+        s += f'NPU:{index} ({device_name})\n'
+        arg = f'npu:{index}'
+    elif not cpu and not mps and torch.cuda.is_available():  # prefer GPU if available
         devices = device.split(',') if device else '0'  # range(torch.cuda.device_count())  # i.e. 0,1,6,7
         n = len(devices)  # device count
         if n > 1 and batch_size > 0:  # check batch_size is divisible by device_count
@@ -145,6 +178,8 @@ def time_sync():
     # PyTorch-accurate time
     if torch.cuda.is_available():
         torch.cuda.synchronize()
+    elif _npu_is_available():
+        torch.npu.synchronize()
     return time.time()
 
 
