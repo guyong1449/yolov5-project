@@ -57,3 +57,8 @@ def valid_payloads_for_batch(payloads, *, batch_id: int, total_frames: int, buff
     valid = [payload for payload in payloads if payload is not None]
     valid.sort(key=lambda item: int(item["frame_idx"]))
     return valid[:expected]
+
+
+def retain_batch_payload(pending_payload, new_payload):
+    """Persist the last payload for a rank until the gather boundary."""
+    return new_payload if new_payload is not None else pending_payload

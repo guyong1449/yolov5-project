@@ -33,7 +33,7 @@ from ultralytics.utils.plotting import Annotator, colors, save_one_box
 from models.common import DetectMultiBackend
 from utils.dataloaders import IMG_FORMATS, VID_FORMATS, LoadImages, LoadScreenshots, LoadStreams
 from utils.ddp_batch_buffer import (expected_batch_size, is_batch_boundary, resolve_batch_slot,
-                                    should_rank_process_frame, valid_payloads_for_batch)
+                                    retain_batch_payload, should_rank_process_frame, valid_payloads_for_batch)
 from utils.general import (LOGGER, Profile, check_file, check_img_size, check_imshow, check_requirements, colorstr, cv2,
                            increment_path, non_max_suppression, print_args, scale_boxes, strip_optimizer, xyxy2xywh)
 from utils.torch_utils import select_device, smart_inference_mode
@@ -498,6 +498,7 @@ def run(
     tail_batch_size = 0
     prev_video_for_mark = None
     logged_video_path = None
+    pending_payload = None
     needs_image_payload = save_img or save_crop or view_img or save_img_frames
     total_video_frames = int(getattr(dataset, 'frames', 0) or 0) if batch_buffer else 0
     csv_path = save_dir / 'predictions.csv'
@@ -517,7 +518,7 @@ def run(
         frame_idx = max(shard_frame - 1, 0) if batch_buffer else shard_frame
         if batch_buffer:
             slot = resolve_batch_slot(frame_idx, effective_buffer_size)
-            local_payload = None
+            current_payload = None
             if should_rank_process_frame(frame_idx, RANK, effective_buffer_size):
                 processed_frames += 1
                 with dt[0]:
@@ -539,7 +540,7 @@ def run(
                 if len(det):
                     det[:, :4] = scale_boxes(im_tensor.shape[2:], det[:, :4], im0s.shape).round()
                 log_s = summarize_detection_log(s, im_tensor.shape[2:], det, names)
-                local_payload = {
+                current_payload = {
                     'frame_idx': frame_idx,
                     'batch_id': slot.batch_id,
                     'path': path,
@@ -550,10 +551,11 @@ def run(
                     'log_s': log_s,
                     'infer_time_ms': dt[1].dt * 1E3,
                 }
+            pending_payload = retain_batch_payload(pending_payload, current_payload)
 
             if is_batch_boundary(frame_idx, total_video_frames, effective_buffer_size):
                 gathered_payloads = [None for _ in range(WORLD_SIZE)]
-                dist.all_gather_object(gathered_payloads, local_payload)
+                dist.all_gather_object(gathered_payloads, pending_payload)
                 processed_batches += 1
                 expected_size = expected_batch_size(slot.batch_id, total_video_frames, effective_buffer_size)
                 if expected_size < effective_buffer_size:
@@ -592,6 +594,7 @@ def run(
                             annotations_dir=annotations_dir if save_img_frames else None,
                         )
                         LOGGER.info(f"{payload['log_s']}{payload['infer_time_ms']:.1f}ms")
+                pending_payload = None
             continue
         if not should_process_frame(shard_frame, ddp_infer=ddp_infer, rank=RANK, world_size=WORLD_SIZE):
             continue
