@@ -35,5 +35,5 @@ jobs:
 
       - name: Run unit tests
         run: |
-          # dataAirVis.yaml points at local F:/ dataset paths; skip on GitHub-hosted runners.
+          # dataAirVis.yaml points at local /root/workspace dataset paths; skip on GitHub-hosted runners.
           pytest tests/ --ignore=tests/test_data_airvis_four_class.py -q

@@ -9,6 +9,7 @@ ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from utils.env_config import get_dedup_reports_dir
 from tools.fiftyone.fiftyone_compute_similarity import compute_similarity_run
 from tools.fiftyone.fiftyone_import_voc import import_voc_dataset
 from tools.fiftyone.fiftyone_deduplicate_dataset import (
@@ -82,7 +83,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--report-dir",
         type=Path,
-        default=Path(r"F:\1\labelimg\data\test1_stride10\fiftyone_voc\dedup_reports"),
+        default=Path(get_dedup_reports_dir()),
         help="Directory for CSV/JSON reports and charts.",
     )
     parser.add_argument(

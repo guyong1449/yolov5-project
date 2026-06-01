@@ -12,6 +12,7 @@ ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from utils.env_config import get_dedup_reports_dir
 from tools.fiftyone.fiftyone_dedup_report import get_report_data_dir, write_dedup_csv, write_json_report
 
 
@@ -24,7 +25,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--report-dir",
         type=Path,
-        default=Path(r"F:\1\labelimg\data\test1_stride10\fiftyone_voc\dedup_reports"),
+        default=Path(get_dedup_reports_dir()),
         help="Directory for CSV/JSON reports and charts.",
     )
     parser.add_argument(

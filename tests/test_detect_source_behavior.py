@@ -3,6 +3,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 
 import numpy as np
 
@@ -12,6 +13,7 @@ if str(ROOT) not in sys.path:
 
 import detect  # noqa: E402
 from utils.dataloaders import LoadImages  # noqa: E402
+from utils.env_config import get_video_dir  # noqa: E402
 
 
 class FakeVideoCapture:
@@ -65,7 +67,7 @@ class TestDetectSourceBehavior(unittest.TestCase):
         )
 
         message = detect.format_video_start_log(
-            Path('F:/1/video/output/demo.mp4'),
+            Path(get_video_dir()) / 'demo.mp4',
             file_index=2,
             file_total=3,
             vid_cap=cap,
@@ -106,6 +108,54 @@ class TestDetectSourceBehavior(unittest.TestCase):
         xml_text = saved_xml.read_text(encoding='utf-8')
         self.assertIn('<filename>video4_7_mp4_frame000123.jpg</filename>', xml_text)
         self.assertIn('<name>drone</name>', xml_text)
+
+    def test_batch_buffer_accepts_local_video_collections(self):
+        files = [self.tmp / 'a.mp4', self.tmp / 'b.avi']
+        for path in files:
+            path.write_text('video')
+        dataset = SimpleNamespace(
+            files=[str(path) for path in files],
+            video_flag=[True, True],
+            frames=12,
+        )
+
+        detect.ensure_batch_buffer_supported(
+            batch_buffer=True,
+            ddp_infer=True,
+            buffer_size=2,
+            world_size=4,
+            source=str(self.tmp / '**' / '*.*'),
+            is_file=False,
+            is_url=False,
+            webcam=False,
+            screenshot=False,
+            dataset=dataset,
+        )
+
+    def test_batch_buffer_rejects_mixed_non_video_sources(self):
+        video = self.tmp / 'a.mp4'
+        image = self.tmp / 'b.jpg'
+        video.write_text('video')
+        image.write_text('image')
+        dataset = SimpleNamespace(
+            files=[str(video), str(image)],
+            video_flag=[True, False],
+            frames=12,
+        )
+
+        with self.assertRaisesRegex(ValueError, 'every resolved source item to be a video file'):
+            detect.ensure_batch_buffer_supported(
+                batch_buffer=True,
+                ddp_infer=True,
+                buffer_size=2,
+                world_size=4,
+                source=str(self.tmp),
+                is_file=False,
+                is_url=False,
+                webcam=False,
+                screenshot=False,
+                dataset=dataset,
+            )
 
 
 if __name__ == '__main__':

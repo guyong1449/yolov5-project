@@ -274,6 +274,10 @@ def box_iou(box1, box2, eps=1e-7):
             IoU values for every element in boxes1 and boxes2
     """
 
+    if box1.device != box2.device and ('npu' in {box1.device.type, box2.device.type}):
+        box1 = box1.cpu()
+        box2 = box2.cpu()
+
     # inter(N,M) = (rb(N,M,2) - lt(N,M,2)).clamp(0).prod(2)
     (a1, a2), (b1, b2) = box1.unsqueeze(1).chunk(2, 2), box2.unsqueeze(0).chunk(2, 2)
     inter = (torch.min(a2, b2) - torch.max(a1, b1)).clamp(0).prod(2)

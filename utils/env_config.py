@@ -1,0 +1,172 @@
+"""Centralized environment configuration for the yolov5-project.
+
+Reads .env from the project root (if present) and exposes typed accessor
+functions with sensible fallbacks.  No third-party dependency required.
+
+Usage::
+
+    from utils.env_config import get_video_dir, get_device
+    source = get_video_dir()          # env YOLO_VIDEO_DIR or fallback
+    device = get_device()             # env YOLO_DEVICE or fallback
+"""
+
+from __future__ import annotations
+
+import os
+from pathlib import Path
+
+# ---------------------------------------------------------------------------
+# Locate project root (one level above this file's parent utils/)
+# ---------------------------------------------------------------------------
+_PROJECT_ROOT = Path(__file__).resolve().parents[1]
+_WORKSPACE_ROOT = _PROJECT_ROOT.parents[1]  # e.g. /root/workspace when project is at /root/workspace/repos/yolov5-project
+
+# ---------------------------------------------------------------------------
+# Load .env (simple KEY=VALUE parser, no python-dotenv dependency)
+# ---------------------------------------------------------------------------
+
+def _load_dotenv(env_path: Path) -> None:
+    """Parse a .env file and set missing keys in os.environ."""
+    if not env_path.is_file():
+        return
+    with open(env_path, encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            if "=" not in line:
+                continue
+            key, _, value = line.partition("=")
+            key = key.strip()
+            value = value.strip().strip('"').strip("'")
+            # Only set if not already in the environment (env vars take precedence)
+            if key and key not in os.environ:
+                os.environ[key] = value
+
+_load_dotenv(_PROJECT_ROOT / ".env")
+
+
+def _env_or(key: str, fallback: str) -> str:
+    """Return env value if set and non-empty, otherwise fallback."""
+    val = os.environ.get(key, "")
+    return val if val else fallback
+
+
+# ---------------------------------------------------------------------------
+# Accessors — each returns the env value or a hardcoded fallback.
+# ---------------------------------------------------------------------------
+
+def get_data_root() -> str:
+    """Root data directory. Fallback: <workspace>/data (sibling of project's grandparent)."""
+    return _env_or("YOLO_DATA_ROOT", str(_WORKSPACE_ROOT / "data"))
+
+
+def get_dataset_dir() -> str:
+    """Dataset directory with train.txt / val.txt. Fallback: <data_root>/labelimg/test1_stride10"""
+    return _env_or(
+        "YOLO_DATASET_DIR",
+        os.path.join(get_data_root(), "labelimg", "test1_stride10"),
+    )
+
+
+def get_video_dir() -> str:
+    """Directory containing inference source videos. Fallback: <data_root>/videos"""
+    return _env_or("YOLO_VIDEO_DIR", os.path.join(get_data_root(), "videos"))
+
+
+def get_dedup_reports_dir() -> str:
+    """FiftyOne dedup report output directory. Fallback: <dataset_dir>/fiftyone_voc/dedup_reports"""
+    return _env_or(
+        "YOLO_DEDUP_REPORTS_DIR",
+        os.path.join(get_dataset_dir(), "fiftyone_voc", "dedup_reports"),
+    )
+
+
+def get_output_root() -> str:
+    """Root output directory for runs. Fallback: <workspace>/outputs/runs."""
+    return _env_or("YOLO_OUTPUT_ROOT", str(_WORKSPACE_ROOT / "outputs" / "runs"))
+
+
+def get_output_dir(subdir: str) -> str:
+    """Return <output_root>/<subdir>, e.g. get_output_dir('train') → '<output_root>/train'."""
+    return os.path.join(get_output_root(), subdir)
+
+
+def get_weights() -> str:
+    """Default model weights path (relative to project root or absolute)."""
+    return _env_or("YOLO_WEIGHTS", "checkpoint/yolov5_best.pt")
+
+
+def get_device() -> str:
+    """Default compute device."""
+    return _env_or("YOLO_DEVICE", "npu:0,1,2,3")
+
+
+def get_gui_host() -> str:
+    """GUI panel bind host."""
+    return _env_or("YOLO_GUI_HOST", "127.0.0.1")
+
+
+def get_gui_port() -> int:
+    """GUI panel bind port."""
+    return int(_env_or("YOLO_GUI_PORT", "8752"))
+
+
+def get_hyp_file() -> str:
+    """Default hyperparameter YAML (relative to project root)."""
+    return _env_or("YOLO_HYP_FILE", "runs/train/test1_stride10_sgd_70e3/hyp.yaml")
+
+
+def get_data_yaml() -> str:
+    """Default dataset YAML (relative to project root)."""
+    return _env_or("YOLO_DATA_YAML", "data/dataAirVis.yaml")
+
+
+def get_ddp_data_yaml() -> str:
+    """DDP training dataset YAML (absolute or relative to project root). Fallback: same as data_yaml."""
+    return _env_or("YOLO_DDP_DATA_YAML", get_data_yaml())
+
+
+def get_master_port() -> str:
+    """Default DDP master port."""
+    return _env_or("YOLO_MASTER_PORT", "29501")
+
+
+# ---------------------------------------------------------------------------
+# YAML sync — regenerate dataAirVis.yaml from current env vars
+# ---------------------------------------------------------------------------
+
+_DATA_YAML_TEMPLATE = """\
+# YOLOv5 数据集配置文件：用于告诉训练脚本图片/标签在哪里，以及一共有多少类。
+# Auto-generated by utils/env_config.py — do not edit train/val paths manually.
+# To regenerate: python -c "from utils.env_config import sync_data_yaml; sync_data_yaml()"
+
+train: {train}
+val: {val}
+
+nc: 4
+
+names:
+  - ptarget
+  - bird
+  - drone
+  - fixedWing
+"""
+
+
+def sync_data_yaml(yaml_path: str | None = None) -> Path:
+    """Regenerate dataAirVis.yaml from YOLO_DATASET_DIR env var.
+
+    Call this after changing YOLO_DATASET_DIR in .env to keep the YAML in sync.
+    Usage:  python -c "from utils.env_config import sync_data_yaml; sync_data_yaml()"
+    """
+    dataset_dir = get_dataset_dir()
+    train_txt = os.path.join(dataset_dir, "train.txt")
+    val_txt = os.path.join(dataset_dir, "val.txt")
+    target = Path(yaml_path) if yaml_path else _PROJECT_ROOT / get_data_yaml()
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(
+        _DATA_YAML_TEMPLATE.format(train=train_txt, val=val_txt),
+        encoding="utf-8",
+    )
+    return target

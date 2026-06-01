@@ -3,19 +3,19 @@
 ## 环境
 
 - 依赖安装到 `f312`
-- 启动解释器固定使用 `D:\Miniconda3\envs\f312\python.exe`
+- 启动解释器固定使用 `python`（先 `conda activate f312`）
 
 ## 安装依赖
 
-```powershell
-D:\Miniconda3\envs\f312\python.exe -m pip install -r requirements.txt
+```bash
+python -m pip install -r requirements.txt
 ```
 
 ## 启动面板
 
-```powershell
-cd F:\1\yolov5-master
-D:\Miniconda3\envs\f312\python.exe tools\gui_panel\start_gui_panel.py
+```bash
+cd /root/workspace/repos/yolov5-project
+python tools/gui_panel/start_gui_panel.py
 ```
 
 默认地址：
@@ -24,12 +24,12 @@ D:\Miniconda3\envs\f312\python.exe tools\gui_panel\start_gui_panel.py
 
 ## 可选端口
 
-```powershell
-D:\Miniconda3\envs\f312\python.exe tools\gui_panel\start_gui_panel.py --port 8760
+```bash
+python tools/gui_panel/start_gui_panel.py --port 8760
 ```
 
 ## 验证
 
-```powershell
-D:\Miniconda3\envs\f312\python.exe -m unittest tests.test_gui_panel tests.test_run_with_log
+```bash
+python -m unittest tests.test_gui_panel tests.test_run_with_log
 ```

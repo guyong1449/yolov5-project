@@ -196,7 +196,6 @@ class Profile(contextlib.ContextDecorator):
     # YOLOv5 Profile class. Usage: @Profile() decorator or 'with Profile():' context manager
     def __init__(self, t=0.0):
         self.t = t
-        self.cuda = torch.cuda.is_available()
 
     def __enter__(self):
         self.start = self.time()
@@ -207,9 +206,9 @@ class Profile(contextlib.ContextDecorator):
         self.t += self.dt  # accumulate dt
 
     def time(self):
-        if self.cuda:
-            torch.cuda.synchronize()
-        return time.time()
+        from utils.torch_utils import time_sync
+
+        return time_sync()
 
 
 class Timeout(contextlib.ContextDecorator):
@@ -900,6 +899,7 @@ def non_max_suppression(
 
     device = prediction.device
     mps = 'mps' in device.type  # Apple MPS
+    npu = 'npu' in device.type
     if mps:  # MPS not fully supported yet, convert tensors to CPU before NMS
         prediction = prediction.cpu()
     bs = prediction.shape[0]  # batch size
@@ -963,12 +963,17 @@ def non_max_suppression(
         n = x.shape[0]  # number of boxes
         if not n:  # no boxes
             continue
+        if npu:
+            x = x.cpu()
         x = x[x[:, 4].argsort(descending=True)[:max_nms]]  # sort by confidence and remove excess boxes
 
         # Batched NMS
         c = x[:, 5:6] * (0 if agnostic else max_wh)  # classes
         boxes, scores = x[:, :4] + c, x[:, 4]  # boxes (offset by class), scores
-        i = torchvision.ops.nms(boxes, scores, iou_thres)  # NMS
+        if npu:
+            i = torchvision.ops.nms(boxes, scores, iou_thres)  # NMS on CPU for torch_npu stability
+        else:
+            i = torchvision.ops.nms(boxes, scores, iou_thres)  # NMS
         i = i[:max_det]  # limit detections
         if merge and (1 < n < 3E3):  # Merge NMS (boxes merged using weighted mean)
             # update boxes as boxes(i,4) = weights(i,n) * boxes(n,4)

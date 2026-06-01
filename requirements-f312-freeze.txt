@@ -1,8 +1,8 @@
 # requirements-f312-freeze.txt
-# Conda env: f312 (D:\Miniconda3\envs\f312)
+# Conda env: f312 (/root/miniconda3/envs/f312)
 # Exported: 2026-05-27T07:54:21Z
 # Python: Python 3.12.13
-# Install: D:\Miniconda3\envs\f312\python.exe -m pip install -r requirements-f312-freeze.txt
+# Install: /root/miniconda3/envs/f312/bin/python -m pip install -r requirements-f312-freeze.txt
 # Note: torch/torchvision with CUDA are often installed via conda/pip extra index; verify GPU build after install.
 --index-url https://mirrors.ustc.edu.cn/pypi/web/simple
 

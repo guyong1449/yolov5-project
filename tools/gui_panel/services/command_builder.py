@@ -5,13 +5,14 @@ import sys
 from pathlib import Path
 from typing import Any
 
+from utils.env_config import get_hyp_file
 from tools.gui_panel.schemas import ValidationResponse
 from tools.gui_panel.services.fiftyone_resolver import resolve_dataset_root
 from tools.gui_panel.task_specs import TASK_SPECS
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 DEFAULT_TRAIN_HYP_CANDIDATES = [
-    REPO_ROOT / "runs" / "train" / "test1_stride10_sgd_70e3" / "hyp.yaml",
+    REPO_ROOT / get_hyp_file(),
 ]
 
 

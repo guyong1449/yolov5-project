@@ -56,7 +56,7 @@ curl -I https://www.google.com
 
 ### 3. 可选：`ssh 189` 时自动建隧道
 
-在 `C:\Users\admin\.ssh\config` 的 `Host 189` 中增加（或单独建 `189-proxy` 别名）：
+在 `~/.ssh/config` 的 `Host 189` 中增加（或单独建 `189-proxy` 别名）：
 
 ```sshconfig
   RemoteForward 17890 127.0.0.1:7890

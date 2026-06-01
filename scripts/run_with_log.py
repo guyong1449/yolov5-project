@@ -6,7 +6,7 @@ Adapted from Spectralmae ``scripts/run_with_log.py`` for this YOLOv5 repo.
 Typical usage::
 
     python scripts/run_with_log.py --name smoke_train -- \\
-        D:/Miniconda3/python.exe train.py --data data/dataAirVis.yaml ...
+        python train.py --data data/dataAirVis.yaml ...
 
 The Markdown file is meant for in-editor viewing (Cursor/VS Code preview).
 Raw text is also written to a ``.log`` sibling file.
@@ -14,7 +14,7 @@ Raw text is also written to a ``.log`` sibling file.
 Examples::
 
     python scripts/run_with_log.py --name val_check -- \\
-        D:/Miniconda3/python.exe val.py --data data/dataAirVis.yaml ...
+        python val.py --data data/dataAirVis.yaml ...
 
     python scripts/run_with_log.py -l runs/logs/custom.log --append -- \\
         python detect.py --weights checkpoint/yolov5_best.pt --source bus.jpg
@@ -27,6 +27,7 @@ import os
 import shlex
 import subprocess
 import sys
+import time
 from datetime import datetime
 from pathlib import Path
 from typing import IO, Iterable, List, Optional, Sequence, Union
@@ -60,11 +61,12 @@ def _option_value(parts: Sequence[str], option: str) -> Optional[str]:
 
 def _train_run_dir(command: Union[str, Sequence[str], None]) -> Optional[Path]:
     parts = _command_parts(command)
-    if not any(Path(part).name.lower() == "train.py" for part in parts):
+    train_entries = {"train.py", "npu_ddp_training_benchmark.sh"}
+    if not any(Path(part).name.lower() in train_entries for part in parts):
         return None
 
-    project = _option_value(parts, "--project")
-    name = _option_value(parts, "--name")
+    project = _option_value(parts, "--project") or os.environ.get("PROJECT_DIR")
+    name = _option_value(parts, "--name") or os.environ.get("RUN_NAME")
     if not project or not name:
         return None
 
@@ -78,6 +80,266 @@ def _train_run_dir(command: Union[str, Sequence[str], None]) -> Optional[Path]:
     return project_path / name
 
 
+def _is_train_command(command: Union[str, Sequence[str], None]) -> bool:
+    train_entries = {"train.py", "npu_ddp_training_benchmark.sh"}
+    return any(Path(part).name.lower() in train_entries for part in _command_parts(command))
+
+
+def _is_detect_command(command: Union[str, Sequence[str], None]) -> bool:
+    detect_entries = {"detect.py", "npu_video_benchmark.sh", "npu_ddp_detect_benchmark.sh"}
+    return any(Path(part).name.lower() in detect_entries for part in _command_parts(command))
+
+
+def _timing_mode(command: Union[str, Sequence[str], None]) -> str:
+    device = (_option_value(_command_parts(command), "--device") or os.environ.get("DEVICE") or "").strip().lower()
+    return "synced_speed" if device.startswith("npu") else "wall_clock_primary"
+
+
+def _timing_log_path(log_path: Path) -> Path:
+    return log_path.with_name(f"{log_path.stem}_inference_time.txt")
+
+
+def _training_summary_log_path(log_path: Path) -> Path:
+    return log_path.with_name(f"{log_path.stem}_ddp_training_summary.txt")
+
+
+def _parallel_inference_summary_log_path(log_path: Path) -> Path:
+    return log_path.with_name(f"{log_path.stem}_parallel_inference_summary.txt")
+
+
+def _is_parallel_detect_command(command: Union[str, Sequence[str], None]) -> bool:
+    parts = _command_parts(command)
+    return _is_detect_command(command) and ("--ddp-infer" in parts or "npu_ddp_detect_benchmark.sh" in {Path(part).name.lower() for part in parts})
+
+
+def _ddp_summary(command: Union[str, Sequence[str]], output_lines: Sequence[str]) -> list[str]:
+    parts = _command_parts(command)
+    device = (_option_value(parts, "--device") or os.environ.get("DEVICE") or "").strip()
+    world_size = os.environ.get("WORLD_SIZE", "") or os.environ.get("NPROC_PER_NODE", "")
+    if not world_size:
+        for index, part in enumerate(parts):
+            if part == "--nproc_per_node" and index + 1 < len(parts):
+                world_size = parts[index + 1]
+                break
+            if part.startswith("--nproc_per_node="):
+                world_size = part.split("=", 1)[1]
+                break
+
+    backend = ""
+    rank_lines = []
+    epochs_completed = ""
+    for line in output_lines:
+        if line.startswith("DDP init:"):
+            rank_lines.append(line)
+            if "backend=" in line and not backend:
+                backend = line.split("backend=", 1)[1].split()[0]
+            if "world_size=" in line and not world_size:
+                world_size = line.split("world_size=", 1)[1].split()[0]
+            if "device=" in line and not device:
+                device = line.split("device=", 1)[1].split()[0]
+        if "epochs completed in" in line:
+            epochs_completed = line
+
+    rank_ids = set()
+    for line in rank_lines:
+        if "local_rank=" in line:
+            rank_ids.add(line.split("local_rank=", 1)[1].split()[0])
+
+    expected_world_size = int(world_size) if world_size.isdigit() else None
+    rank_coverage_ok = len(rank_ids) == expected_world_size if expected_world_size else bool(rank_lines)
+    ddp_confirmed = bool(rank_lines and backend == "hccl" and epochs_completed)
+    return [
+        f"world_size={world_size or 'unknown'}",
+        f"backend={backend or 'unknown'}",
+        f"device={device or 'unknown'}",
+        f"rank_lines={len(rank_lines)}",
+        f"rank_coverage_ok={'true' if rank_coverage_ok else 'false'}",
+        f"ddp_confirmed={'true' if ddp_confirmed else 'false'}",
+        f"epochs_completed={epochs_completed}",
+    ]
+
+
+def _parallel_detect_summary(command: Union[str, Sequence[str]], output_lines: Sequence[str]) -> list[str]:
+    parts = _command_parts(command)
+    device = (_option_value(parts, "--device") or os.environ.get("DEVICE") or "").strip()
+    source = (_option_value(parts, "--source") or os.environ.get("SOURCE_PATH") or "").strip()
+    world_size = os.environ.get("WORLD_SIZE", "") or os.environ.get("NPROC_PER_NODE", "")
+    if not world_size:
+        for index, part in enumerate(parts):
+            if part == "--nproc_per_node" and index + 1 < len(parts):
+                world_size = parts[index + 1]
+                break
+            if part.startswith("--nproc_per_node="):
+                world_size = part.split("=", 1)[1]
+                break
+
+    init_ranks = set()
+    done_counts = {}
+    done_batches = {}
+    aggregate_frames = ""
+    rank_frame_counts = ""
+    speed_line = ""
+    infer_mode = ""
+    buffer_size = ""
+    batch_count = ""
+    tail_batch_size = ""
+    for line in output_lines:
+        if line.startswith("INFER init:"):
+            if "rank=" in line:
+                init_ranks.add(line.split("rank=", 1)[1].split()[0])
+            if "device=" in line and not device:
+                device = line.split("device=", 1)[1].split()[0]
+            if "source=" in line and not source:
+                source = line.split("source=", 1)[1].split()[0]
+            if "world_size=" in line and not world_size:
+                world_size = line.split("world_size=", 1)[1].split()[0]
+            if "infer_mode=" in line and not infer_mode:
+                infer_mode = line.split("infer_mode=", 1)[1].split()[0]
+            if "buffer_size=" in line and not buffer_size:
+                buffer_size = line.split("buffer_size=", 1)[1].split()[0]
+        elif line.startswith("INFER done:") and "rank=" in line and "processed_frames=" in line:
+            rank = line.split("rank=", 1)[1].split()[0]
+            count = line.split("processed_frames=", 1)[1].split()[0]
+            done_counts[rank] = count
+            if "processed_batches=" in line:
+                done_batches[rank] = line.split("processed_batches=", 1)[1].split()[0]
+            if "infer_mode=" in line and not infer_mode:
+                infer_mode = line.split("infer_mode=", 1)[1].split()[0]
+            if "buffer_size=" in line and not buffer_size:
+                buffer_size = line.split("buffer_size=", 1)[1].split()[0]
+        elif line.startswith("INFER aggregate:"):
+            if "rank_frame_counts=" in line:
+                rank_frame_counts = line.split("rank_frame_counts=", 1)[1].split()[0]
+            if "aggregate_frames=" in line:
+                aggregate_frames = line.split("aggregate_frames=", 1)[1].split()[0]
+            if "world_size=" in line and not world_size:
+                world_size = line.split("world_size=", 1)[1].split()[0]
+            if "infer_mode=" in line and not infer_mode:
+                infer_mode = line.split("infer_mode=", 1)[1].split()[0]
+            if "buffer_size=" in line and not buffer_size:
+                buffer_size = line.split("buffer_size=", 1)[1].split()[0]
+            if "batch_count=" in line:
+                batch_count = line.split("batch_count=", 1)[1].split()[0]
+            if "tail_batch_size=" in line:
+                tail_batch_size = line.split("tail_batch_size=", 1)[1].split()[0]
+        elif "Speed:" in line:
+            speed_line = line
+
+    expected_world_size = int(world_size) if world_size.isdigit() else None
+    all_ranks_seen = len(init_ranks) == expected_world_size if expected_world_size else bool(init_ranks)
+    nonzero_ranks = sorted(rank for rank, count in done_counts.items() if count.isdigit() and int(count) > 0)
+    parsed_aggregate_counts = {}
+    if rank_frame_counts:
+        for pair in rank_frame_counts.split(','):
+            if ':' not in pair:
+                continue
+            rank, count = pair.split(':', 1)
+            parsed_aggregate_counts[rank] = count
+    aggregate_nonzero_ranks = sorted(
+        rank for rank, count in parsed_aggregate_counts.items() if count.isdigit() and int(count) > 0
+    )
+    all_nonzero = len(nonzero_ranks) == expected_world_size if expected_world_size else bool(nonzero_ranks)
+    aggregate_all_nonzero = (
+        len(aggregate_nonzero_ranks) == expected_world_size if expected_world_size else bool(aggregate_nonzero_ranks)
+    )
+    parallel_infer_confirmed = bool(aggregate_frames) and (
+        (all_ranks_seen and all_nonzero) or aggregate_all_nonzero
+    )
+    ordered_counts = ",".join(f"{rank}:{done_counts[rank]}" for rank in sorted(done_counts, key=int))
+    ordered_batches = ",".join(f"{rank}:{done_batches[rank]}" for rank in sorted(done_batches, key=int))
+
+    return [
+        f"world_size={world_size or 'unknown'}",
+        f"device={device or 'unknown'}",
+        f"source={source or 'unknown'}",
+        f"infer_mode={infer_mode or 'mod'}",
+        f"buffer_size={buffer_size or '0'}",
+        f"rank_lines={len(init_ranks)}",
+        f"rank_done_counts={ordered_counts}",
+        f"rank_batch_counts={ordered_batches}",
+        f"rank_frame_counts={rank_frame_counts or ordered_counts}",
+        f"aggregate_frames={aggregate_frames or 'unknown'}",
+        f"batch_count={batch_count or '0'}",
+        f"tail_batch_size={tail_batch_size or '0'}",
+        f"parallel_infer_confirmed={'true' if parallel_infer_confirmed else 'false'}",
+        f"speed_line={speed_line}",
+    ]
+
+
+def _write_timing_sidecar(
+    command: Union[str, Sequence[str]],
+    *,
+    log_path: Path,
+    start_time: datetime,
+    end_time: datetime,
+    elapsed_seconds: float,
+    output_lines: Sequence[str],
+) -> None:
+    if not _is_detect_command(command):
+        return
+
+    parts = _command_parts(command)
+    run_name = _option_value(parts, "--name") or log_path.stem
+    speed_line = next((line for line in reversed(output_lines) if "Speed:" in line), "")
+    content = [
+        f"run_name={run_name}",
+        f"start_time={start_time:%Y-%m-%d %H:%M:%S}",
+        f"end_time={end_time:%Y-%m-%d %H:%M:%S}",
+        f"wall_clock_seconds={elapsed_seconds:.6f}",
+        f"timing_mode={_timing_mode(command)}",
+        f"speed_line={speed_line}",
+    ]
+    _timing_log_path(log_path).write_text("\n".join(content) + "\n", encoding="utf-8")
+
+
+def _write_training_sidecar(
+    command: Union[str, Sequence[str]],
+    *,
+    log_path: Path,
+    start_time: datetime,
+    end_time: datetime,
+    elapsed_seconds: float,
+    output_lines: Sequence[str],
+) -> None:
+    if not _is_train_command(command):
+        return
+
+    parts = _command_parts(command)
+    run_name = _option_value(parts, "--name") or os.environ.get("RUN_NAME") or log_path.stem
+    content = [
+        f"run_name={run_name}",
+        f"start_time={start_time:%Y-%m-%d %H:%M:%S}",
+        f"end_time={end_time:%Y-%m-%d %H:%M:%S}",
+        f"wall_clock_seconds={elapsed_seconds:.6f}",
+    ]
+    content.extend(_ddp_summary(command, output_lines))
+    _training_summary_log_path(log_path).write_text("\n".join(content) + "\n", encoding="utf-8")
+
+
+def _write_parallel_detect_sidecar(
+    command: Union[str, Sequence[str]],
+    *,
+    log_path: Path,
+    start_time: datetime,
+    end_time: datetime,
+    elapsed_seconds: float,
+    output_lines: Sequence[str],
+) -> None:
+    if not _is_parallel_detect_command(command):
+        return
+
+    parts = _command_parts(command)
+    run_name = _option_value(parts, "--name") or os.environ.get("RUN_NAME") or log_path.stem
+    content = [
+        f"run_name={run_name}",
+        f"start_time={start_time:%Y-%m-%d %H:%M:%S}",
+        f"end_time={end_time:%Y-%m-%d %H:%M:%S}",
+        f"wall_clock_seconds={elapsed_seconds:.6f}",
+    ]
+    content.extend(_parallel_detect_summary(command, output_lines))
+    _parallel_inference_summary_log_path(log_path).write_text("\n".join(content) + "\n", encoding="utf-8")
+
+
 def _resolve_paths(
     log_file: Optional[Path],
     md_file: Optional[Path],
@@ -87,13 +349,11 @@ def _resolve_paths(
 ) -> tuple[Path, Path]:
     stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     stem = name or f"run_{stamp}"
+    task_dir = DEFAULT_LOG_DIR / f"{stem}_{stamp}"
+    train_run_dir = _train_run_dir(command)
 
     if log_file is None:
-        train_run_dir = _train_run_dir(command)
-        if train_run_dir is not None:
-            log_file = train_run_dir / "run.log"
-        else:
-            log_file = DEFAULT_LOG_DIR / f"{stem}.log"
+        log_file = (train_run_dir / "run.log") if train_run_dir else (task_dir / "run.log")
     else:
         log_file = Path(log_file)
         if not log_file.is_absolute():
@@ -249,6 +509,7 @@ def run_with_log(
     """Execute *command* and mirror merged stdout/stderr to log + Markdown files."""
     log_path, md_path = _resolve_paths(log_file, md_file, name, command=command)
     workdir = Path(cwd) if cwd else None
+    start_monotonic = time.perf_counter()
     mirror = MarkdownLogMirror(
         log_path,
         md_path,
@@ -286,6 +547,30 @@ def run_with_log(
         return_code = process.wait()
         process.stdout.close()
         mirror.close(return_code)
+        _write_timing_sidecar(
+            command,
+            log_path=log_path,
+            start_time=mirror.start_time,
+            end_time=datetime.now(),
+            elapsed_seconds=time.perf_counter() - start_monotonic,
+            output_lines=mirror._lines,
+        )
+        _write_training_sidecar(
+            command,
+            log_path=log_path,
+            start_time=mirror.start_time,
+            end_time=datetime.now(),
+            elapsed_seconds=time.perf_counter() - start_monotonic,
+            output_lines=mirror._lines,
+        )
+        _write_parallel_detect_sidecar(
+            command,
+            log_path=log_path,
+            start_time=mirror.start_time,
+            end_time=datetime.now(),
+            elapsed_seconds=time.perf_counter() - start_monotonic,
+            output_lines=mirror._lines,
+        )
         return return_code
     except KeyboardInterrupt:
         process.terminate()
@@ -295,6 +580,30 @@ def run_with_log(
             process.kill()
             process.wait()
         mirror.close(130, interrupted=True)
+        _write_timing_sidecar(
+            command,
+            log_path=log_path,
+            start_time=mirror.start_time,
+            end_time=datetime.now(),
+            elapsed_seconds=time.perf_counter() - start_monotonic,
+            output_lines=mirror._lines,
+        )
+        _write_training_sidecar(
+            command,
+            log_path=log_path,
+            start_time=mirror.start_time,
+            end_time=datetime.now(),
+            elapsed_seconds=time.perf_counter() - start_monotonic,
+            output_lines=mirror._lines,
+        )
+        _write_parallel_detect_sidecar(
+            command,
+            log_path=log_path,
+            start_time=mirror.start_time,
+            end_time=datetime.now(),
+            elapsed_seconds=time.perf_counter() - start_monotonic,
+            output_lines=mirror._lines,
+        )
         return 130
 
 
@@ -304,13 +613,15 @@ def _parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     )
     parser.add_argument(
         "--log",
+        "--log-file",
         "-l",
         type=str,
         default=None,
-        help="Plain-text log path (default: train.py writes to runs/train/<name>/run.log, otherwise runs/logs/<name>.log).",
+        help="Plain-text log path (default: runs/logs/<name>_<timestamp>/run.log).",
     )
     parser.add_argument(
         "--md",
+        "--md-file",
         type=str,
         default=None,
         help="Markdown view path (default: same stem as --log with .md suffix).",
@@ -320,7 +631,7 @@ def _parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
         "-n",
         type=str,
         default=None,
-        help="Run name used when --log is omitted (default: run_<timestamp>).",
+        help="Run name used when --log is omitted (default: run_<timestamp>, grouped under one task folder).",
     )
     parser.add_argument("--append", "-a", action="store_true", help="Append to existing log files.")
     parser.add_argument("--no-realtime", action="store_true", help="Do not echo output to the terminal.")

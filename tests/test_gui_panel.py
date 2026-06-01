@@ -9,6 +9,8 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from utils.env_config import get_dataset_dir, get_data_root  # noqa: E402
+
 
 class GuiPanelTaskSpecTests(unittest.TestCase):
     def test_task_definitions_cover_supported_tasks(self):
@@ -27,7 +29,7 @@ class GuiPanelTaskSpecTests(unittest.TestCase):
         self.assertEqual(defaults["vid_stride"], 10)
         self.assertTrue(defaults["incremental_mp4"])
         self.assertTrue(defaults["nosave"])
-        self.assertEqual(defaults["voc_root"], "F:/1/labelimg/data/test1_stride10")
+        self.assertEqual(defaults["voc_root"], get_dataset_dir())
         self.assertEqual(defaults["conf_thres"], 0.25)
         self.assertEqual(defaults["iou_thres"], 0.45)
 
@@ -225,16 +227,18 @@ class GuiPanelLauncherTests(unittest.TestCase):
     def test_repo_launcher_uses_pwsh7_and_opens_panel_url(self):
         launcher = (ROOT / "tools" / "gui_panel" / "start_gui_panel.cmd").read_text(encoding="utf-8")
 
-        self.assertIn(r"C:\Program Files\PowerShell\7\pwsh.exe", launcher)
+        self.assertIn("pwsh", launcher)
         self.assertIn("tools/gui_panel/start_gui_panel.py", launcher)
         self.assertIn("http://127.0.0.1:8752/", launcher)
 
     def test_path_dialog_prefers_powershell_sta_dialog(self):
         from tools.gui_panel.services.path_dialog import build_dialog_invocation
 
-        command, script = build_dialog_invocation("directory", "选择目录", r"F:\1\labelimg\data\panel_smoke10")
+        import os
+        test_dir = os.path.join(get_data_root(), "labelimg", "panel_smoke10")
+        command, script = build_dialog_invocation("directory", "选择目录", test_dir)
 
-        self.assertEqual(command[0], r"C:\Program Files\PowerShell\7\pwsh.exe")
+        self.assertEqual(command[0], "pwsh")
         self.assertIn("-STA", command)
         self.assertIn("FolderBrowserDialog", script)
         self.assertIn("panel_smoke10", script)

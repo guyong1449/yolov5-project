@@ -1,5 +1,6 @@
 """Sanity checks for 4-class dataAirVis / test1_stride10 training path."""
 
+import os
 import sys
 import unittest
 from pathlib import Path
@@ -10,12 +11,13 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from utils.env_config import get_dataset_dir  # noqa: E402
 from utils.general import check_dataset  # noqa: E402
 
 EXPECTED_NAMES = ["ptarget", "bird", "drone", "fixedWing"]
 DATA_YAMLS = [
     ROOT / "data" / "dataAirVis.yaml",
-    Path("F:/1/labelimg/data/test1_stride10/data.yaml"),
+    Path(os.path.join(get_dataset_dir(), "data.yaml")),
 ]
 
 

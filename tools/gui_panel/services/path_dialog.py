@@ -4,7 +4,7 @@ import subprocess
 import tempfile
 from pathlib import Path
 
-PWSH_PATH = Path(r"C:\Program Files\PowerShell\7\pwsh.exe")
+PWSH_PATH = Path("pwsh")
 
 
 def build_dialog_invocation(kind: str, title: str, initial_path: str = "") -> tuple[list[str], str]:

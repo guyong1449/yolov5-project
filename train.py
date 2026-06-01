@@ -46,6 +46,7 @@ if str(ROOT) not in sys.path:
 ROOT = Path(os.path.relpath(ROOT, Path.cwd()))  # relative
 
 import val as validate  # for end-of-epoch mAP
+from utils.env_config import get_data_yaml, get_device, get_hyp_file, get_output_dir, get_weights
 from models.experimental import attempt_load
 from models.yolo import Model
 from utils.autoanchor import check_anchors
@@ -74,6 +75,37 @@ GIT_INFO = {
     "branch": "none",
     "commit": "none"
 }
+
+
+def initialize_distributed_training(opt, device):
+    if LOCAL_RANK == -1:
+        return device
+
+    msg = 'is not compatible with YOLOv5 Multi-GPU DDP training'
+    assert not opt.image_weights, f'--image-weights {msg}'
+    assert not opt.evolve, f'--evolve {msg}'
+    assert opt.batch_size != -1, f'AutoBatch with --batch-size -1 {msg}, please pass a valid --batch-size'
+    assert opt.batch_size % WORLD_SIZE == 0, f'--batch-size {opt.batch_size} must be multiple of WORLD_SIZE'
+
+    device_request = str(opt.device).strip().lower()
+    if device_request.startswith('npu'):
+        assert hasattr(torch, 'npu') and torch.npu.is_available(), 'NPU DDP requested but torch.npu is unavailable'
+        assert hasattr(dist, 'is_hccl_available') and dist.is_hccl_available(), 'NPU DDP requires torch.distributed HCCL backend'
+        assert torch.npu.device_count() > LOCAL_RANK, 'insufficient NPU devices for DDP command'
+        torch.npu.set_device(LOCAL_RANK)
+        device = torch.device('npu', LOCAL_RANK)
+        backend = 'hccl'
+    else:
+        assert torch.cuda.device_count() > LOCAL_RANK, 'insufficient CUDA devices for DDP command'
+        torch.cuda.set_device(LOCAL_RANK)
+        device = torch.device('cuda', LOCAL_RANK)
+        backend = 'nccl' if dist.is_nccl_available() else 'gloo'
+
+    LOGGER.info(
+        f"DDP init: rank={RANK} local_rank={LOCAL_RANK} world_size={WORLD_SIZE} backend={backend} device={device}"
+    )
+    dist.init_process_group(backend=backend)
+    return device
 
 
 def train_image_dir(save_dir):
@@ -454,10 +486,10 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
 
 def parse_opt(known=False):
     parser = argparse.ArgumentParser()
-    parser.add_argument('--weights', type=str, default=ROOT / 'yolov5s.pt', help='initial weights path')
+    parser.add_argument('--weights', type=str, default=get_weights(), help='initial weights path')
     parser.add_argument('--cfg', type=str, default='', help='model.yaml path')
-    parser.add_argument('--data', type=str, default=ROOT / 'dataAirVis.yaml', help='dataset.yaml path')
-    parser.add_argument('--hyp', type=str, default=ROOT / 'data/hyps/hyp.scratch-low.yaml', help='hyperparameters path')
+    parser.add_argument('--data', type=str, default=get_data_yaml(), help='dataset.yaml path')
+    parser.add_argument('--hyp', type=str, default=get_hyp_file(), help='hyperparameters path')
     parser.add_argument('--epochs', type=int, default=300, help='total training epochs')
     parser.add_argument('--batch-size', type=int, default=16, help='total batch size for all GPUs, -1 for autobatch')
     parser.add_argument('--imgsz', '--img', '--img-size', type=int, default=640, help='train, val image size (pixels)')
@@ -471,7 +503,7 @@ def parse_opt(known=False):
     parser.add_argument('--bucket', type=str, default='', help='gsutil bucket')
     parser.add_argument('--cache', type=str, nargs='?', const='ram', help='image --cache ram/disk')
     parser.add_argument('--image-weights', action='store_true', help='use weighted image selection for training')
-    parser.add_argument('--device', default='0', help='cuda device, i.e. 0 or 0,1,2,3 or cpu')
+    parser.add_argument('--device', default=get_device(), help='cuda device, i.e. 0 or 0,1,2,3 or cpu')
     parser.add_argument('--multi-scale', action='store_true', help='vary img-size +/- 50%%')
     parser.add_argument('--single-cls', action='store_true', help='train multi-class data as single-class')
     parser.add_argument('--optimizer', type=str, choices=['SGD', 'Adam', 'AdamW'], default='SGD', help='optimizer')
@@ -480,7 +512,7 @@ def parse_opt(known=False):
     parser.set_defaults(amp=False)
     parser.add_argument('--sync-bn', action='store_true', help='use SyncBatchNorm, only available in DDP mode')
     parser.add_argument('--workers', type=int, default=8, help='max dataloader workers (per RANK in DDP mode)')
-    parser.add_argument('--project', default=ROOT / 'runs/train', help='save to project/name')
+    parser.add_argument('--project', default=get_output_dir('train'), help='save to project/name')
     parser.add_argument('--name', default='exp', help='save to project/name')
     parser.add_argument('--exist-ok', action='store_true', help='existing project/name ok, do not increment')
     parser.add_argument('--quad', action='store_true', help='quad dataloader')
@@ -533,8 +565,8 @@ def main(opt, callbacks=Callbacks()):
         opt.amp_requested_off = '--no-amp' in sys.argv[1:]
         assert len(opt.cfg) or len(opt.weights), 'either --cfg or --weights must be specified'
         if opt.evolve:
-            if opt.project == str(ROOT / 'runs/train'):  # if default project name, rename to runs/evolve
-                opt.project = str(ROOT / 'runs/evolve')
+            if opt.project == get_output_dir('train'):  # if default project name, rename to runs/evolve
+                opt.project = get_output_dir('evolve')
             opt.exist_ok, opt.resume = opt.resume, False  # pass resume to exist_ok and disable resume
         if opt.name == 'cfg':
             opt.name = Path(opt.cfg).stem  # use model.yaml as name
@@ -543,16 +575,7 @@ def main(opt, callbacks=Callbacks()):
 
     # DDP mode
     device = select_device(opt.device, batch_size=opt.batch_size)
-    if LOCAL_RANK != -1:
-        msg = 'is not compatible with YOLOv5 Multi-GPU DDP training'
-        assert not opt.image_weights, f'--image-weights {msg}'
-        assert not opt.evolve, f'--evolve {msg}'
-        assert opt.batch_size != -1, f'AutoBatch with --batch-size -1 {msg}, please pass a valid --batch-size'
-        assert opt.batch_size % WORLD_SIZE == 0, f'--batch-size {opt.batch_size} must be multiple of WORLD_SIZE'
-        assert torch.cuda.device_count() > LOCAL_RANK, 'insufficient CUDA devices for DDP command'
-        torch.cuda.set_device(LOCAL_RANK)
-        device = torch.device('cuda', LOCAL_RANK)
-        dist.init_process_group(backend='nccl' if dist.is_nccl_available() else 'gloo')
+    device = initialize_distributed_training(opt, device)
 
     # Train
     if not opt.evolve:

@@ -11,14 +11,21 @@
 1. 加入tracking增强连续目标跨帧检测
 2. 加入适合yolo检测小目标的额外头
 
-## 当前辅助流程
+- 在 **4 个 NPU** 上启用并稳定运行 **DDP 分布式训练**。
+- 目标包括：可重复启动、日志可追溯、失败可定位、单机多卡吞吐提升可量化。
 
-- FiftyOne 去重流程说明见 [docs/fiftyone-dedup-workflow.md](/abs/path/F:/1/yolov5-master/docs/fiftyone-dedup-workflow.md)
-- `ssh 189` 本机代理中转见 [docs/189-mihomo-usage.md](docs/189-mihomo-usage.md)；GitHub SSH 排查见 [docs/189-github-ssh.md](docs/189-github-ssh.md)
-- GUI 面板架构说明见 [docs/gui-panel/architecture.md](/abs/path/F:/1/yolov5-master/docs/gui-panel/architecture.md)
-- GUI 面板任务规格见 [docs/gui-panel/task-specs.md](/abs/path/F:/1/yolov5-master/docs/gui-panel/task-specs.md)
-- GUI 面板 FiftyOne 集成见 [docs/gui-panel/fiftyone-integration.md](/abs/path/F:/1/yolov5-master/docs/gui-panel/fiftyone-integration.md)
-- GUI 面板启动方式见 [docs/gui-panel/startup.md](/abs/path/F:/1/yolov5-master/docs/gui-panel/startup.md)
+## 工作要求
+
+- 涉及训练、验证、推理命令时，优先显式传 `--data`、`--weights`、`--source`、`--device`、`--project`、`--name`、`--seed`。
+- 涉及数据集改动前，先核对 YAML 中 `train`、`val`、`nc`、`names` 一致性。
+- 涉及日志输出时，优先使用 `scripts/run_with_log.py`，并保持同一任务产物落在同一目录。
+- 若修改训练或分布式相关逻辑，需说明对单卡流程的兼容性影响。
+
+## 辅助流程
+
+- FiftyOne 去重流程：`docs/fiftyone-dedup-workflow.md`。
+- 网络与 SSH 相关：`docs/189-mihomo-usage.md`、`docs/189-github-ssh.md`。
+- GUI 面板文档：`docs/gui-panel/architecture.md`、`docs/gui-panel/task-specs.md`、`docs/gui-panel/fiftyone-integration.md`、`docs/gui-panel/startup.md`。
 
 ## 红线
 
@@ -35,9 +42,14 @@
 
 ## 当前目录约定
 
-- `tools/fiftyone/`：FiftyOne 导入、相似度、去重、启动器
+- `tools/fiftyone/`：FiftyOne 导入、相似度、去重、启动器 
 - `tools/ssh_189/`：`189` 反向代理隧道脚本
 - `tools/label_tools.py`：VOC / YOLO / FiftyOne 标签处理
+- `tools/npu_ddp_detect_benchmark.sh`：4 卡并行 detect 包装脚本
+- `docs/npu-detect-dataflow.md`：detect 单进程 / 四卡并行的数据通路说明
+- `docs/npu-detect-run-commands.md`：NPU detect 运行命令与三轮实测口径
+- `scripts/run_with_log.py`：统一日志、Markdown 与并行摘要落盘
+- `tests/test_npu_benchmark_dryrun.py`、`tests/test_npu_ddp_support.py`：NPU detect/DDP 相关测试
 - `archive/`：已归档的官方示例、缓存、副本和训练压缩包
 
 ## 最小验证

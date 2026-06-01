@@ -2,18 +2,18 @@
 
 当前仓库的 XML 转 YOLO TXT 脚本入口放在：
 
-- [scripts/voc_xml_to_yolo.py](/F:/1/yolov5-master/scripts/voc_xml_to_yolo.py)
+- `scripts/voc_xml_to_yolo.py`
 
 底层实现复用：
 
-- [tools/label_tools.py](/F:/1/yolov5-master/tools/label_tools.py)
+- `tools/label_tools.py`
 
 ## 执行命令
 
-```powershell
-D:\Miniconda3\python.exe F:\1\yolov5-master\scripts\voc_xml_to_yolo.py voc-xml-to-yolo `
-  --dataset-root F:\1\labelimg\data\yolo_data_stride3 `
-  --data-yaml F:\1\yolov5-master\data\dataAirVis.yaml
+```bash
+python /root/workspace/repos/yolov5-project/scripts/voc_xml_to_yolo.py voc-xml-to-yolo \
+  --dataset-root /root/workspace/data/labelimg/yolo_data_stride3 \
+  --data-yaml /root/workspace/repos/yolov5-project/data/dataAirVis.yaml
 ```
 
 ## 参数说明
@@ -26,10 +26,10 @@ D:\Miniconda3\python.exe F:\1\yolov5-master\scripts\voc_xml_to_yolo.py voc-xml-t
 
 如果你希望在覆盖已有 `labels/*.txt` 前先备份，可以加：
 
-```powershell
-D:\Miniconda3\python.exe F:\1\yolov5-master\scripts\voc_xml_to_yolo.py voc-xml-to-yolo `
-  --dataset-root F:\1\labelimg\data\yolo_data_stride3 `
-  --data-yaml F:\1\yolov5-master\data\dataAirVis.yaml `
-  --backup `
+```bash
+python /root/workspace/repos/yolov5-project/scripts/voc_xml_to_yolo.py voc-xml-to-yolo \
+  --dataset-root /root/workspace/data/labelimg/yolo_data_stride3 \
+  --data-yaml /root/workspace/repos/yolov5-project/data/dataAirVis.yaml \
+  --backup \
   --backup-suffix .xmlbak
 ```

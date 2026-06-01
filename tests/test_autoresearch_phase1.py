@@ -31,10 +31,11 @@ class TestAutoResearchPhase1(unittest.TestCase):
         self.assertEqual(autoresearch_phase1.extract_map50(results_csv), 0.612)
 
     def test_build_train_command_uses_explicit_args(self):
+        custom_python = "/opt/conda/envs/yolo/bin/python"
         command, save_dir = autoresearch_phase1.build_train_command(
             stage="smoke",
             candidate_id="cand_a",
-            python_executable=Path(r"D:\Miniconda3\envs\yolo\python.exe"),
+            python_executable=Path(custom_python),
             data_path=ROOT / "data" / "dataAirVis.yaml",
             weights_path=ROOT / "checkpoint" / "yolov5_best.pt",
             device="0",
@@ -43,7 +44,7 @@ class TestAutoResearchPhase1(unittest.TestCase):
             hyp_path=ROOT / "data" / "hyps" / "hyp.scratch-low.yaml",
         )
 
-        self.assertEqual(command[0], r"D:\Miniconda3\envs\yolo\python.exe")
+        self.assertEqual(command[0], custom_python)
         self.assertIn("--optimizer", command)
         self.assertIn("AdamW", command)
         self.assertIn("--cos-lr", command)

@@ -21,6 +21,9 @@ python /opt/torch_env/npu_stress_all.py
 ```bash
 scp -r /root/workspace/data/videos/video20.mp4 root@189:/root/workspace/repos/yolov5-project/checkpoint
 ```
+```bash
+scp root@192.168.2.189:/root/workspace/outputs/runs/npu_video20_r3/video20.mp4 /f/video/
+```
 
 ## 当前推荐命令
 

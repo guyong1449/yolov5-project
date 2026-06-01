@@ -10,35 +10,20 @@ const state = {
 
 let baseCommand = "";
 
-const EXAMPLE_COMMANDS = {
-  train: [
-    {
-      label: "标准训练 (SGD, 70 epochs)",
-      command:
-        'D:/Miniconda3/python.exe scripts/run_with_log.py -- \\\n  D:/Miniconda3/python.exe train.py \\\n  --data F:/1/labelimg/data/test1_stride10/data.yaml \\\n  --weights F:\\1\\yolov5-master\\runs\\train\\test1_stride10_sgd_70e3\\weights\\best.pt \\\n  --epochs 70 --batch-size 4 --imgsz 640 \\\n  --device 0 --seed 0 --workers 2 --patience 20 \\\n  --optimizer SGD --project runs/train --name test1_stride10_sgd_70e',
-    },
-  ],
-  detect: [
-    {
-      label: "VOC 抽帧导出 (vid-stride=10)",
-      command:
-        'D:/Miniconda3/python.exe detect.py \\\n  --weights checkpoint/yolov5_best.pt \\\n  --source "F:/1/video/output" \\\n  --data F:/1/labelimg/data/test1_stride10/data.yaml \\\n  --imgsz 640 --device 0 \\\n  --project runs/detect --name voc_stride10 \\\n  --voc-root F:/1/labelimg/data/test1_stride10 \\\n  --vid-stride 10 --save-img-frames --nosave --incremental-mp4',
-    },
-    {
-      label: "封装脚本 (extract_voc_stride10)",
-      command:
-        'D:/Miniconda3/python.exe scripts/extract_voc_stride10.py \\\n  --weights checkpoint/yolov5_best.pt \\\n  --source "F:/1/video/output" \\\n  --voc-root F:/1/labelimg/data/test2_stride10 \\\n  --data-yaml F:/1/labelimg/data/test1_stride10/data.yaml \\\n  --device 0',
-    },
-  ],
+let EXAMPLE_COMMANDS = {
+  train: [],
+  detect: [],
   val: [],
-  fiftyone: [
-    {
-      label: "FiftyOne 连续去重",
-      command:
-        'D:\\Miniconda3\\envs\\f312\\python.exe tools\\fiftyone\\fiftyone_run_full_dedup_pipeline.py \\\n  --dataset-name test1_stride10_voc \\\n  --model clip-vit-base32-torch \\\n  --brain-key clip_vit_base32_sim \\\n  --approx-threshold 0.12 --approx-group-keep-ratio 0.3 \\\n  --voc-root "F:\\1\\labelimg\\data\\test1_stride10\\fiftyone_voc" \\\n  --export-dir "F:\\1\\labelimg\\data\\test1_stride10\\fiftyone_voc_deduped" \\\n  --report-dir "F:\\1\\labelimg\\data\\test1_stride10\\fiftyone_voc\\dedup_reports" \\\n  --overwrite',
-    },
-  ],
+  fiftyone: [],
 };
+
+async function loadExampleCommands() {
+  try {
+    EXAMPLE_COMMANDS = await fetchJson("/api/example-commands");
+  } catch (_) {
+    // fallback: keep empty
+  }
+}
 
 async function fetchJson(url, options = {}) {
   const response = await fetch(url, {
@@ -61,6 +46,7 @@ async function fetchJson(url, options = {}) {
 }
 
 async function init() {
+  await loadExampleCommands();
   const payload = await fetchJson("/api/task-definitions");
   state.taskDefinitions = payload.tasks;
   state.session = payload.session || {};

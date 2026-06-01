@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from utils.env_config import get_data_yaml, get_dataset_dir, get_device, get_hyp_file, get_output_dir, get_weights
 from tools.gui_panel.schemas import FieldSpec, TaskSpec
 
 
@@ -59,11 +60,11 @@ TASK_SPECS: dict[str, TaskSpec] = {
                       help_text="模型结构配置文件（.yaml），通常使用默认即可"),
         ],
         defaults={
-            "data": "data/dataAirVis.yaml",
-            "weights": "checkpoint/yolov5_best.pt",
-            "project": "runs/train",
+            "data": get_data_yaml(),
+            "weights": get_weights(),
+            "project": get_output_dir("train"),
             "name": "panel_train",
-            "device": "0",
+            "device": get_device(),
             "epochs": 70,
             "batch_size": 4,
             "imgsz": 640,
@@ -74,7 +75,7 @@ TASK_SPECS: dict[str, TaskSpec] = {
             "exist_ok": False,
             "amp_mode": "off",
             "resume": False,
-            "hyp": "runs/train/test1_stride10_sgd_70e3/hyp.yaml",
+            "hyp": get_hyp_file(),
             "cfg": "",
             "extra_args": "",
         },
@@ -125,12 +126,12 @@ TASK_SPECS: dict[str, TaskSpec] = {
                       help_text="允许覆盖已存在的同名输出目录"),
         ],
         defaults={
-            "weights": "checkpoint/yolov5_best.pt",
+            "weights": get_weights(),
             "source": "",
-            "data": "data/dataAirVis.yaml",
-            "project": "runs/detect",
+            "data": get_data_yaml(),
+            "project": get_output_dir("detect"),
             "name": "voc_stride10",
-            "device": "0",
+            "device": get_device(),
             "imgsz": 640,
             "conf_thres": 0.25,
             "iou_thres": 0.45,
@@ -140,7 +141,7 @@ TASK_SPECS: dict[str, TaskSpec] = {
             "nosave": True,
             "save_img_frames": True,
             "vid_stride": 10,
-            "voc_root": "F:/1/labelimg/data/test1_stride10",
+            "voc_root": get_dataset_dir(),
             "incremental_mp4": True,
             "classes": "",
             "exist_ok": False,
@@ -188,11 +189,11 @@ TASK_SPECS: dict[str, TaskSpec] = {
                       help_text="允许覆盖已存在的同名输出目录"),
         ],
         defaults={
-            "data": "data/dataAirVis.yaml",
-            "weights": "checkpoint/yolov5_best.pt",
-            "project": "runs/val",
+            "data": get_data_yaml(),
+            "weights": get_weights(),
+            "project": get_output_dir("val"),
             "name": "panel_val",
-            "device": "0",
+            "device": get_device(),
             "batch_size": 4,
             "imgsz": 640,
             "conf_thres": 0.001,

@@ -8,37 +8,37 @@
 
 ## 文件位置
 
-- 总控脚本：[tools/fiftyone/fiftyone_run_full_dedup_pipeline.py](/abs/path/F:/1/yolov5-master/tools/fiftyone/fiftyone_run_full_dedup_pipeline.py)
-- 导入脚本：[tools/fiftyone/fiftyone_import_voc.py](/abs/path/F:/1/yolov5-master/tools/fiftyone/fiftyone_import_voc.py)
-- 相似度脚本：[tools/fiftyone/fiftyone_compute_similarity.py](/abs/path/F:/1/yolov5-master/tools/fiftyone/fiftyone_compute_similarity.py)
-- 去重脚本：[tools/fiftyone/fiftyone_deduplicate_dataset.py](/abs/path/F:/1/yolov5-master/tools/fiftyone/fiftyone_deduplicate_dataset.py)
-- 启动器：[tools/fiftyone/start_fiftyone_voc.ps1](/abs/path/F:/1/yolov5-master/tools/fiftyone/start_fiftyone_voc.ps1)
+- 总控脚本：`tools/fiftyone/fiftyone_run_full_dedup_pipeline.py`
+- 导入脚本：`tools/fiftyone/fiftyone_import_voc.py`
+- 相似度脚本：`tools/fiftyone/fiftyone_compute_similarity.py`
+- 去重脚本：`tools/fiftyone/fiftyone_deduplicate_dataset.py`
+- 启动器：`tools/fiftyone/start_fiftyone_voc.ps1`
 
 ## 当前约定
 
 - 源数据集名：`test1_stride10_voc`
-- 原始 VOC 根目录：`F:\1\labelimg\data\test1_stride10\fiftyone_voc`
-- 导出目录：`F:\1\labelimg\data\test1_stride10\fiftyone_voc_deduped`
-- 报告目录：`F:\1\labelimg\data\test1_stride10\fiftyone_voc\dedup_reports`
-- 精确重复备份目录：`F:\1\labelimg\data\test1_stride10\fiftyone_voc\backup_removed_exact`
+- 原始 VOC 根目录：`/root/workspace/data/labelimg/test1_stride10/fiftyone_voc`
+- 导出目录：`/root/workspace/data/labelimg/test1_stride10/fiftyone_voc_deduped`
+- 报告目录：`/root/workspace/data/labelimg/test1_stride10/fiftyone_voc/dedup_reports`
+- 精确重复备份目录：`/root/workspace/data/labelimg/test1_stride10/fiftyone_voc/backup_removed_exact`
 
 ## 环境
 
-- 真实运行：`D:\Miniconda3\envs\f312\python.exe`
-- 单测运行：`D:\Miniconda3\envs\yolo\Scripts\python.exe -m unittest tests.test_fiftyone_tools`
+- 真实运行：`python`（在 `f312` 环境中）
+- 单测运行：`python -m unittest tests.test_fiftyone_tools`
 
 ## 主命令
 
-```powershell
-D:\Miniconda3\envs\f312\python.exe tools\fiftyone\fiftyone_run_full_dedup_pipeline.py `
-  --dataset-name test1_stride10_voc `
-  --model clip-vit-base32-torch `
-  --brain-key clip_vit_base32_sim `
-  --approx-threshold 0.12 `
-  --approx-group-keep-ratio 0.3 `
-  --voc-root "F:\1\labelimg\data\test1_stride10\fiftyone_voc" `
-  --export-dir "F:\1\labelimg\data\test1_stride10\fiftyone_voc_deduped" `
-  --report-dir "F:\1\labelimg\data\test1_stride10\fiftyone_voc\dedup_reports" `
+```bash
+python tools/fiftyone/fiftyone_run_full_dedup_pipeline.py \
+  --dataset-name test1_stride10_voc \
+  --model clip-vit-base32-torch \
+  --brain-key clip_vit_base32_sim \
+  --approx-threshold 0.12 \
+  --approx-group-keep-ratio 0.3 \
+  --voc-root "/root/workspace/data/labelimg/test1_stride10/fiftyone_voc" \
+  --export-dir "/root/workspace/data/labelimg/test1_stride10/fiftyone_voc_deduped" \
+  --report-dir "/root/workspace/data/labelimg/test1_stride10/fiftyone_voc/dedup_reports" \
   --overwrite
 ```
 
@@ -56,36 +56,36 @@ D:\Miniconda3\envs\f312\python.exe tools\fiftyone\fiftyone_run_full_dedup_pipeli
 
 ### 导入 VOC
 
-```powershell
-D:\Miniconda3\envs\f312\python.exe tools\fiftyone\fiftyone_import_voc.py `
-  --name test1_stride10_voc `
-  --data-dir "F:\1\labelimg\data\test1_stride10\fiftyone_voc\data" `
-  --labels-dir "F:\1\labelimg\data\test1_stride10\fiftyone_voc\labels" `
+```bash
+python tools/fiftyone/fiftyone_import_voc.py \
+  --name test1_stride10_voc \
+  --data-dir "/root/workspace/data/labelimg/test1_stride10/fiftyone_voc/data" \
+  --labels-dir "/root/workspace/data/labelimg/test1_stride10/fiftyone_voc/labels" \
   --overwrite
 ```
 
 ### 计算相似度
 
-```powershell
-D:\Miniconda3\envs\f312\python.exe tools\fiftyone\fiftyone_compute_similarity.py `
-  --dataset-name test1_stride10_voc `
-  --model clip-vit-base32-torch `
-  --brain-key clip_vit_base32_sim `
+```bash
+python tools/fiftyone/fiftyone_compute_similarity.py \
+  --dataset-name test1_stride10_voc \
+  --model clip-vit-base32-torch \
+  --brain-key clip_vit_base32_sim \
   --overwrite
 ```
 
 ### 单独去重导出
 
-```powershell
-D:\Miniconda3\envs\f312\python.exe tools\fiftyone\fiftyone_deduplicate_dataset.py `
-  --dataset-name test1_stride10_voc `
-  --export-dir "F:\1\labelimg\data\test1_stride10\fiftyone_voc_deduped" `
-  --report-dir "F:\1\labelimg\data\test1_stride10\fiftyone_voc\dedup_reports" `
-  --label-field ground_truth `
-  --exact-mode deduplicate `
-  --approx-brain-key clip_vit_base32_sim `
-  --approx-threshold 0.12 `
-  --approx-group-keep-ratio 0.3 `
+```bash
+python tools/fiftyone/fiftyone_deduplicate_dataset.py \
+  --dataset-name test1_stride10_voc \
+  --export-dir "/root/workspace/data/labelimg/test1_stride10/fiftyone_voc_deduped" \
+  --report-dir "/root/workspace/data/labelimg/test1_stride10/fiftyone_voc/dedup_reports" \
+  --label-field ground_truth \
+  --exact-mode deduplicate \
+  --approx-brain-key clip_vit_base32_sim \
+  --approx-threshold 0.12 \
+  --approx-group-keep-ratio 0.3 \
   --overwrite
 ```
 

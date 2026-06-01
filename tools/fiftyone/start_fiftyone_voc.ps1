@@ -1,10 +1,28 @@
 $ErrorActionPreference = "Stop"
 
 $projectRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
-$pythonExe = "D:\Miniconda3\envs\f312\python.exe"
+$workspaceRoot = Split-Path -Parent (Split-Path -Parent $projectRoot)
+
+# Load .env if present
+$envFile = Join-Path $projectRoot ".env"
+if (Test-Path -LiteralPath $envFile) {
+    Get-Content $envFile | ForEach-Object {
+        $line = $_.Trim()
+        if ($line -and -not $line.StartsWith("#") -and $line -match "^([^#=]+)=(.*)$") {
+            $key = $Matches[1].Trim()
+            $val = $Matches[2].Trim().Trim('"').Trim("'")
+            if (-not [Environment]::GetEnvironmentVariable($key)) {
+                [Environment]::SetEnvironmentVariable($key, $val, "Process")
+            }
+        }
+    }
+}
+
+$datasetDir = if ($env:YOLO_DATASET_DIR) { $env:YOLO_DATASET_DIR } else { Join-Path $workspaceRoot "data\labelimg\test1_stride10" }
+$pythonExe = "python"
 $importScript = Join-Path $projectRoot "tools\fiftyone\fiftyone_import_voc.py"
-$dataDir = "F:\1\labelimg\data\test1_stride10\fiftyone_voc\data"
-$labelsDir = "F:\1\labelimg\data\test1_stride10\fiftyone_voc\labels"
+$dataDir = Join-Path $datasetDir "fiftyone_voc\data"
+$labelsDir = Join-Path $datasetDir "fiftyone_voc\labels"
 $datasetName = "live_app_check"
 $sessionUrl = "http://localhost:5151/"
 

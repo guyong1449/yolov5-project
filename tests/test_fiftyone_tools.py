@@ -1,10 +1,17 @@
 import csv
 import json
+import os
 import tempfile
 import unittest
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+
+import sys
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
+from utils.env_config import get_dataset_dir  # noqa: E402
 
 
 PNG_1X1 = (
@@ -35,10 +42,12 @@ class TestFiftyOneTools(unittest.TestCase):
 
         contents = script_path.read_text(encoding="utf-8")
 
-        self.assertIn("D:\\Miniconda3\\envs\\f312\\python.exe", contents)
+        self.assertIn("python", contents)
         self.assertIn("tools\\fiftyone\\fiftyone_import_voc.py", contents)
-        self.assertIn("F:\\1\\labelimg\\data\\test1_stride10\\fiftyone_voc\\data", contents)
-        self.assertIn("F:\\1\\labelimg\\data\\test1_stride10\\fiftyone_voc\\labels", contents)
+        expected_data = os.path.join(get_dataset_dir(), "fiftyone_voc", "data")
+        expected_labels = os.path.join(get_dataset_dir(), "fiftyone_voc", "labels")
+        self.assertIn(expected_data, contents)
+        self.assertIn(expected_labels, contents)
         self.assertIn("--wait", contents)
 
     def test_start_fiftyone_bat_exists_and_invokes_ps1(self):
@@ -154,12 +163,13 @@ class TestFiftyOneTools(unittest.TestCase):
     def test_deduplicate_parser_uses_expected_defaults(self):
         from tools.fiftyone.fiftyone_deduplicate_dataset import build_parser
 
+        export_dir = os.path.join(get_dataset_dir(), "fiftyone_voc_deduped")
         args = build_parser().parse_args(
             [
                 "--dataset-name",
                 "test1_stride10_voc",
                 "--export-dir",
-                "F:\\1\\labelimg\\data\\test1_stride10\\fiftyone_voc_deduped",
+                export_dir,
             ]
         )
 
@@ -173,20 +183,22 @@ class TestFiftyOneTools(unittest.TestCase):
     def test_pipeline_parser_uses_expected_defaults(self):
         from tools.fiftyone.fiftyone_run_full_dedup_pipeline import build_parser
 
+        voc_root = os.path.join(get_dataset_dir(), "fiftyone_voc")
+        export_dir = os.path.join(get_dataset_dir(), "fiftyone_voc_deduped")
         args = build_parser().parse_args(
             [
                 "--dataset-name",
                 "test1_stride10_voc",
                 "--voc-root",
-                "F:\\1\\labelimg\\data\\test1_stride10\\fiftyone_voc",
+                voc_root,
                 "--export-dir",
-                "F:\\1\\labelimg\\data\\test1_stride10\\fiftyone_voc_deduped",
+                export_dir,
             ]
         )
 
         self.assertEqual(args.model, "clip-vit-base32-torch")
         self.assertEqual(args.brain_key, "clip_vit_base32_sim")
-        self.assertEqual(args.report_dir, Path(r"F:\1\labelimg\data\test1_stride10\fiftyone_voc\dedup_reports"))
+        self.assertEqual(args.report_dir, Path(os.path.join(get_dataset_dir(), "fiftyone_voc", "dedup_reports")))
         self.assertEqual(args.label_field, "ground_truth")
 
     def test_compute_keep_count_uses_ceiling_and_keeps_at_least_one(self):
@@ -200,10 +212,10 @@ class TestFiftyOneTools(unittest.TestCase):
         from tools.fiftyone.fiftyone_deduplicate_dataset import select_group_ids_for_removal
 
         group_rows = [
-            {"sample_id": "c", "filepath": "C:\\img\\c.jpg"},
-            {"sample_id": "a", "filepath": "C:\\img\\a.jpg"},
-            {"sample_id": "b", "filepath": "C:\\img\\b.jpg"},
-            {"sample_id": "d", "filepath": "C:\\img\\d.jpg"},
+            {"sample_id": "c", "filepath": "/tmp/img/c.jpg"},
+            {"sample_id": "a", "filepath": "/tmp/img/a.jpg"},
+            {"sample_id": "b", "filepath": "/tmp/img/b.jpg"},
+            {"sample_id": "d", "filepath": "/tmp/img/d.jpg"},
         ]
 
         kept_ids, removed_ids = select_group_ids_for_removal(group_rows, 0.3)
@@ -241,7 +253,7 @@ class TestFiftyOneTools(unittest.TestCase):
     def test_get_report_data_dir_returns_report_data_child(self):
         from tools.fiftyone.fiftyone_dedup_report import get_report_data_dir
 
-        report_dir = Path(r"F:\1\labelimg\data\test1_stride10\fiftyone_voc\dedup_reports")
+        report_dir = Path(os.path.join(get_dataset_dir(), "fiftyone_voc", "dedup_reports"))
 
         self.assertEqual(
             get_report_data_dir(report_dir),
@@ -296,9 +308,9 @@ class TestFiftyOneTools(unittest.TestCase):
             approx_duplicate_samples=20,
             approx_removed=15,
             final_samples=75,
-            export_dir=Path("F:/export"),
-            report_dir=Path("F:/reports"),
-            backup_dir=Path("F:/backup"),
+            export_dir=Path("/tmp/export"),
+            report_dir=Path("/tmp/reports"),
+            backup_dir=Path("/tmp/backup"),
             approx_brain_key="clip_vit_base32_sim",
             approx_threshold=0.12,
             approx_group_keep_ratio=0.3,
@@ -406,7 +418,7 @@ class TestFiftyOneTools(unittest.TestCase):
     def test_get_chart_paths_returns_expected_png_paths(self):
         from tools.fiftyone.fiftyone_deduplicate_dataset import get_chart_paths
 
-        report_dir = Path(r"F:\1\labelimg\data\test1_stride10\fiftyone_voc\dedup_reports")
+        report_dir = Path(os.path.join(get_dataset_dir(), "fiftyone_voc", "dedup_reports"))
         paths = get_chart_paths(report_dir)
 
         self.assertEqual(paths["donut"], report_dir.resolve() / "dedup_ratio_donut.png")

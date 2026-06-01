@@ -17,6 +17,7 @@ from tools.gui_panel.services.path_dialog import select_path
 from tools.gui_panel.services.process_runner import ProcessRunner
 from tools.gui_panel.services.session_store import SessionStore
 from tools.gui_panel.task_specs import TASK_SPECS
+from utils.env_config import get_data_yaml, get_dataset_dir, get_device, get_output_dir, get_video_dir, get_weights
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 STATIC_DIR = Path(__file__).resolve().parent / "static"
@@ -155,6 +156,76 @@ def create_app(*, session_file: Path | None = None) -> FastAPI:
             raise HTTPException(status_code=404, detail=f"Path not found: {path}")
         os.startfile(str(path))  # type: ignore[attr-defined]
         return {"status": "ok"}
+
+    @app.get("/api/example-commands")
+    def example_commands() -> dict[str, Any]:
+        weights = get_weights()
+        video_dir = get_video_dir()
+        data_yaml = get_data_yaml()
+        dataset_dir = get_dataset_dir()
+        detect_output = get_output_dir("detect")
+        device = get_device()
+        return {
+            "train": [
+                {
+                    "label": "标准训练 (SGD, 70 epochs)",
+                    "command": (
+                        f"python scripts/run_with_log.py -- \\\n"
+                        f"  python train.py \\\n"
+                        f"  --data {dataset_dir}/data.yaml \\\n"
+                        f"  --weights {weights} \\\n"
+                        f"  --epochs 70 --batch-size 4 --imgsz 640 \\\n"
+                        f"  --device {device} --seed 0 --workers 2 --patience 20 \\\n"
+                        f"  --optimizer SGD --project {get_output_dir('train')} --name test1_stride10_sgd_70e"
+                    ),
+                },
+            ],
+            "detect": [
+                {
+                    "label": "VOC 抽帧导出 (vid-stride=10)",
+                    "command": (
+                        f"python scripts/run_with_log.py -- \\\n"
+                        f"  python detect.py \\\n"
+                        f"  --weights {weights} \\\n"
+                        f"  --source \"{video_dir}\" \\\n"
+                        f"  --data {data_yaml} \\\n"
+                        f"  --imgsz 640 --device cpu \\\n"
+                        f"  --project {detect_output} --name voc_stride10 \\\n"
+                        f"  --voc-root {dataset_dir} \\\n"
+                        f"  --vid-stride 10 --save-img-frames --nosave --incremental-mp4"
+                    ),
+                },
+                {
+                    "label": "封装脚本 (extract_voc_stride10)",
+                    "command": (
+                        f"python scripts/run_with_log.py -- \\\n"
+                        f"  python scripts/extract_voc_stride10.py \\\n"
+                        f"  --weights {weights} \\\n"
+                        f"  --source \"{video_dir}\" \\\n"
+                        f"  --voc-root {dataset_dir.replace('test1', 'test2')} \\\n"
+                        f"  --data-yaml {data_yaml} \\\n"
+                        f"  --device cpu"
+                    ),
+                },
+            ],
+            "val": [],
+            "fiftyone": [
+                {
+                    "label": "FiftyOne 连续去重",
+                    "command": (
+                        f"python tools/fiftyone/fiftyone_run_full_dedup_pipeline.py \\\n"
+                        f"  --dataset-name test1_stride10_voc \\\n"
+                        f"  --model clip-vit-base32-torch \\\n"
+                        f"  --brain-key clip_vit_base32_sim \\\n"
+                        f"  --approx-threshold 0.12 --approx-group-keep-ratio 0.3 \\\n"
+                        f"  --voc-root \"{dataset_dir}/fiftyone_voc\" \\\n"
+                        f"  --export-dir \"{dataset_dir}/fiftyone_voc_deduped\" \\\n"
+                        f"  --report-dir \"{dataset_dir}/fiftyone_voc/dedup_reports\" \\\n"
+                        f"  --overwrite"
+                    ),
+                },
+            ],
+        }
 
     app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
     return app

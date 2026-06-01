@@ -69,10 +69,14 @@ def smart_DDP(model):
     assert not check_version(torch.__version__, '1.12.0', pinned=True), \
         'torch==1.12.0 torchvision==0.13.0 DDP training is not supported due to a known issue. ' \
         'Please upgrade or downgrade torch to use DDP. See https://github.com/ultralytics/yolov5/issues/8395'
+    ddp_kwargs = {}
+    if torch.cuda.is_available() or _npu_is_available():
+        ddp_kwargs.update(device_ids=[LOCAL_RANK], output_device=LOCAL_RANK)
     if check_version(torch.__version__, '1.11.0'):
-        return DDP(model, device_ids=[LOCAL_RANK], output_device=LOCAL_RANK, static_graph=True)
+        ddp_kwargs["static_graph"] = True
+        return DDP(model, **ddp_kwargs)
     else:
-        return DDP(model, device_ids=[LOCAL_RANK], output_device=LOCAL_RANK)
+        return DDP(model, **ddp_kwargs)
 
 
 def reshape_classifier_output(model, n=1000):
@@ -100,11 +104,11 @@ def reshape_classifier_output(model, n=1000):
 @contextmanager
 def torch_distributed_zero_first(local_rank: int):
     # Decorator to make all processes in distributed training wait for each local_master to do something
-    if local_rank not in [-1, 0]:
-        dist.barrier(device_ids=[local_rank])
+    if local_rank not in [-1, 0] and dist.is_available() and dist.is_initialized():
+        dist.barrier()
     yield
-    if local_rank == 0:
-        dist.barrier(device_ids=[0])
+    if local_rank == 0 and dist.is_available() and dist.is_initialized():
+        dist.barrier()
 
 
 def device_count():
@@ -132,15 +136,18 @@ def select_device(device='', batch_size=0, newline=True):
         os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
         requested = device.split(':', 1)[1] if ':' in device else '0'
         requested = requested.strip() or '0'
-        assert ',' not in requested, "NPU '--device' currently supports a single card only, e.g. --device npu:0"
-        assert requested.isdigit(), f"Invalid NPU '--device {device}' requested, use '--device npu:0'"
+        indices = [s.strip() for s in requested.split(',') if s.strip()]
+        assert indices and all(s.isdigit() for s in indices), \
+            f"Invalid NPU '--device {device}' requested, use '--device npu:0 or npu:0,1,2,3'"
         assert _npu_is_available(), \
             "Invalid NPU '--device' requested, torch_npu is not available or torch.npu.is_available() is False"
-        index = int(requested)
+        index = int(indices[0])
         count = torch.npu.device_count()
-        assert count > index, f"Invalid NPU '--device {device}' requested, only {count} NPU device(s) available"
+        for idx_str in indices:
+            assert count > int(idx_str), f"Invalid NPU '--device {device}' requested, only {count} NPU device(s) available"
+        n = len(indices)
         if batch_size > 0:
-            assert batch_size % 1 == 0, f'batch-size {batch_size} not supported by requested NPU configuration'
+            assert batch_size % n == 0, f'batch-size {batch_size} not multiple of NPU count {n}'
     elif device:  # non-cpu device requested
         os.environ['CUDA_VISIBLE_DEVICES'] = device  # set environment variable - must be before assert is_available()
         assert torch.cuda.is_available() and torch.cuda.device_count() >= len(device.replace(',', '')), \
@@ -148,8 +155,11 @@ def select_device(device='', batch_size=0, newline=True):
 
     if npu:
         device_name_fn = getattr(torch.npu, 'get_device_name', None)
-        device_name = device_name_fn(index) if callable(device_name_fn) else f'NPU:{index}'
-        s += f'NPU:{index} ({device_name})\n'
+        space = ' ' * (len(s) + 1)
+        for i, idx_str in enumerate(indices):
+            idx = int(idx_str)
+            device_name = device_name_fn(idx) if callable(device_name_fn) else f'NPU:{idx}'
+            s += f"{'' if i == 0 else space}NPU:{idx} ({device_name})\n"
         arg = f'npu:{index}'
     elif not cpu and not mps and torch.cuda.is_available():  # prefer GPU if available
         devices = device.split(',') if device else '0'  # range(torch.cuda.device_count())  # i.e. 0,1,6,7
