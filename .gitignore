@@ -28,6 +28,11 @@ runs/*
 checkpoint/
 note/
 notes/
+
+# Large binary files — never commit whl/zip archives
+*.whl
+*.zip
+archive/train_packages/
 *.partial
 data/*
 data/images/*
